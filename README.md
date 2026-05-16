@@ -105,3 +105,4 @@ The app checks risk for states, SKUs, state + SKU combinations, and order source
 - Advanced ML RTO prediction using customer location, price, SKU history, and source quality
 update 26531
 update 29480
+update 24593
