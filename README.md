@@ -103,3 +103,4 @@ The app checks risk for states, SKUs, state + SKU combinations, and order source
 - Meesho, Flipkart, and Amazon platform API integrations
 - WhatsApp daily report for sellers
 - Advanced ML RTO prediction using customer location, price, SKU history, and source quality
+update 26531
