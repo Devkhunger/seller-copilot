@@ -27,7 +27,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE
-        sync: false
+        value: https://seller-copilot-m1g3.onrender.com
     routes:
       - type: rewrite
         source: /*
