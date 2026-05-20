@@ -1,0 +1,28 @@
+Order Date,SKU,Product Name,Customer State,Reason for Credit Entry,Order source,Supplier Listed Price (Incl. GST + Commission),Supplier Discounted Price (Incl GST and Commision),Quantity
+2026-05-01,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Maharashtra,DELIVERED,natural,499,399,2
+2026-05-01,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Karnataka,DELIVERED,paid ads,499,399,1
+2026-05-01,SKU-RF-16,Red Floral Cushion Cover 16x16,Bihar,RTO_COMPLETE,paid ads,449,349,1
+2026-05-02,SKU-YL-16,Yellow Cotton Cushion Cover 16x16,West Bengal,CANCELLED,natural,399,329,1
+2026-05-02,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Delhi,DELIVERED,natural,499,399,3
+2026-05-03,SKU-RF-16,Red Floral Cushion Cover 16x16,Bihar,RTO_LOCKED,paid ads,449,349,1
+2026-05-03,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Gujarat,DELIVERED,natural,499,399,1
+2026-05-04,SKU-YL-16,Yellow Cotton Cushion Cover 16x16,Rajasthan,DELIVERED,natural,399,329,1
+2026-05-04,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Maharashtra,DELIVERED,paid ads,499,399,2
+2026-05-05,SKU-RF-16,Red Floral Cushion Cover 16x16,West Bengal,RTO_INITIATED,paid ads,449,349,1
+2026-05-05,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Karnataka,DELIVERED,natural,499,399,2
+2026-05-06,SKU-YL-16,Yellow Cotton Cushion Cover 16x16,Bihar,RTO_COMPLETE,paid ads,399,329,1
+2026-05-06,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Delhi,DELIVERED,natural,499,399,2
+2026-05-07,SKU-RF-16,Red Floral Cushion Cover 16x16,Madhya Pradesh,DELIVERED,natural,449,349,1
+2026-05-07,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Kerala,DELIVERED,paid ads,499,399,1
+2026-05-08,SKU-RF-16,Red Floral Cushion Cover 16x16,Bihar,RTO_COMPLETE,paid ads,449,349,1
+2026-05-08,SKU-RF-16,Red Floral Cushion Cover 16x16,Bihar,DELIVERED,natural,449,349,1
+2026-05-08,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Maharashtra,DELIVERED,natural,499,399,2
+2026-05-09,SKU-BL-18,Blue Geometric Cushion Cover 18x18,Tamil Nadu,DELIVERED,natural,549,429,1
+2026-05-09,SKU-BL-18,Blue Geometric Cushion Cover 18x18,Tamil Nadu,DELIVERED,natural,549,429,2
+2026-05-10,SKU-BL-18,Blue Geometric Cushion Cover 18x18,Karnataka,DELIVERED,paid ads,549,429,1
+2026-05-10,SKU-YL-16,Yellow Cotton Cushion Cover 16x16,West Bengal,DELIVERED,natural,399,329,1
+2026-05-11,SKU-RF-16,Red Floral Cushion Cover 16x16,Bihar,RTO_COMPLETE,paid ads,449,349,1
+2026-05-11,SKU-YL-16,Yellow Cotton Cushion Cover 16x16,Odisha,CANCELLED,natural,399,329,1
+2026-05-12,SKU-SG-16,Sea Green Velvet Cushion Cover 16x16,Delhi,DELIVERED,natural,499,399,2
+2026-05-12,SKU-BL-18,Blue Geometric Cushion Cover 18x18,Kerala,DELIVERED,natural,549,429,1
+
