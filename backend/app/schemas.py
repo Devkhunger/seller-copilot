@@ -17,3 +17,11 @@ class InventoryUpdate(BaseModel):
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=1000)
+
+
+class ProfitSettingsUpdate(BaseModel):
+    product_cost_percent: float | None = Field(default=None, ge=0)
+    marketplace_fee_percent: float | None = Field(default=None, ge=0)
+    forward_shipping_per_order: float | None = Field(default=None, ge=0)
+    return_shipping_per_order: float | None = Field(default=None, ge=0)
+    ad_cost_percent: float | None = Field(default=None, ge=0)

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import ask, dashboard, inventory, listing, ml, upload, usage
+from app.routers import ask, dashboard, inventory, listing, ml, profit, upload, usage
 
 app = FastAPI(title="AI Seller Copilot API")
 
@@ -32,3 +32,4 @@ app.include_router(inventory.router)
 app.include_router(usage.router)
 app.include_router(ask.router)
 app.include_router(ml.router)
+app.include_router(profit.router)
