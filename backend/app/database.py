@@ -57,6 +57,19 @@ def init_db():
                 detail TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS profit_settings (
+                key TEXT PRIMARY KEY,
+                value REAL NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
+            INSERT OR IGNORE INTO profit_settings (key, value) VALUES
+                ('product_cost_percent', 55),
+                ('marketplace_fee_percent', 15),
+                ('forward_shipping_per_order', 40),
+                ('return_shipping_per_order', 70),
+                ('ad_cost_percent', 8);
             """
         )
 

@@ -33,6 +33,12 @@ export const api = {
   markActionDone: (id) => request(`/api/actions/${id}/done`, { method: "POST" }),
   usage: () => request("/api/usage"),
   mlInsights: () => request("/api/ml-insights"),
+  weeklyProfit: () => request("/api/weekly-profit"),
+  saveProfitSettings: (payload) => request("/api/profit-settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
   ask: (question) => request("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

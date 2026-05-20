@@ -9,6 +9,7 @@ import RtoRisk from "./pages/RtoRisk.jsx";
 import SkuScore from "./pages/SkuScore.jsx";
 import Upload from "./pages/Upload.jsx";
 import Usage from "./pages/Usage.jsx";
+import WeeklyProfit from "./pages/WeeklyProfit.jsx";
 import AskCopilot from "./pages/AskCopilot.jsx";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/ask" element={<AskCopilot />} />
         <Route path="/listing-doctor" element={<ListingDoctor />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/weekly-profit" element={<WeeklyProfit />} />
         <Route path="/ml-insights" element={<MlInsights />} />
         <Route path="/usage" element={<Usage />} />
       </Route>

@@ -8,6 +8,7 @@ const links = [
   ["/ask", "Ask Copilot"],
   ["/listing-doctor", "Listing Doctor"],
   ["/inventory", "Inventory"],
+  ["/weekly-profit", "Weekly Profit"],
   ["/ml-insights", "Growth Planner"],
   ["/usage", "Usage"]
 ];
