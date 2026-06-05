@@ -1,9 +1,11 @@
-from fastapi import APIRouter
 
+from fastapi import APIRouter, Depends
+
+from app.auth import get_current_user
 from app.database import log_usage
 from app.services.ml_models import ml_business_insights
 
-router = APIRouter(prefix="/api", tags=["ml"])
+router = APIRouter(prefix="/api", tags=["ml"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/ml-insights")

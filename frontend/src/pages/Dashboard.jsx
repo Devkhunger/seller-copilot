@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import Badge from "../components/Badge.jsx";
 import PageHeader from "../components/PageHeader.jsx";
@@ -7,10 +8,16 @@ import StatCard from "../components/StatCard.jsx";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [profit, setProfit] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.dashboard().then(setData).catch((err) => setError(err.message));
+    Promise.all([api.dashboard(), api.weeklyProfit()])
+      .then(([dashboardData, profitData]) => {
+        setData(dashboardData);
+        setProfit(profitData);
+      })
+      .catch((err) => setError(err.message));
   }, []);
 
   if (error) return <p className="card text-red-700">{error}</p>;
@@ -50,15 +57,39 @@ export default function Dashboard() {
             <p><span className="font-bold">Natural Orders:</span> {m.natural_orders}</p>
           </div>
         </div>
-        <div className="card">
-          <h2 className="text-xl font-black">Today’s 3 Actions</h2>
-          <div className="mt-3 grid gap-3">
-            {data.actions.map((action) => (
-              <label key={action.id} className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
-                <input type="checkbox" checked={Boolean(action.done)} onChange={() => markDone(action.id)} className="mt-1 h-5 w-5 accent-emerald-700" />
-                <span className={action.done ? "text-slate-400 line-through" : ""}>{action.text}</span>
-              </label>
-            ))}
+        <div className="grid gap-5">
+          <div className="card">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black">Weekly Profit Snapshot</h2>
+              <Link to="/weekly-profit" className="text-sm font-semibold text-merchant hover:underline">
+                Open full report
+              </Link>
+            </div>
+            {profit?.summary ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <p><span className="font-bold">Net Profit:</span> {money(profit.summary.net_profit)}</p>
+                <p><span className="font-bold">Margin:</span> {profit.summary.profit_margin_percent}%</p>
+                <p><span className="font-bold">Sales:</span> {money(profit.summary.sales)}</p>
+                <p>
+                  <span className="font-bold">Status:</span>{" "}
+                  <Badge tone={profit.summary.net_profit >= 0 ? "safe" : "risk"}>{profit.summary.status}</Badge>
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-slate-500">Upload dated orders to calculate weekly profit or loss.</p>
+            )}
+          </div>
+
+          <div className="card">
+            <h2 className="text-xl font-black">Today’s 3 Actions</h2>
+            <div className="mt-3 grid gap-3">
+              {data.actions.map((action) => (
+                <label key={action.id} className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+                  <input type="checkbox" checked={Boolean(action.done)} onChange={() => markDone(action.id)} className="mt-1 h-5 w-5 accent-emerald-700" />
+                  <span className={action.done ? "text-slate-400 line-through" : ""}>{action.text}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -84,3 +115,6 @@ export default function Dashboard() {
   );
 }
 
+function money(value) {
+  return `₹${Math.round(value || 0).toLocaleString("en-IN")}`;
+}

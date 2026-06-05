@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import ask, dashboard, inventory, listing, ml, upload, usage
+from app.routers import ask, auth, dashboard, inventory, listing, ml, profit, upload, usage
 
 app = FastAPI(title="AI Seller Copilot API")
 
@@ -11,7 +11,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://seller-copilot-4.onrender.com" 
+        "https://seller-copilot-4.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -29,6 +29,7 @@ def health():
     return {"status": "ok"}
 
 
+app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(dashboard.router)
 app.include_router(listing.router)
@@ -36,3 +37,4 @@ app.include_router(inventory.router)
 app.include_router(usage.router)
 app.include_router(ask.router)
 app.include_router(ml.router)
+app.include_router(profit.router)
