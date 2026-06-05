@@ -1,4 +1,11 @@
+
 from pydantic import BaseModel, Field
+
+
+class AuthRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(default="", max_length=120)
 
 
 class ListingDoctorRequest(BaseModel):

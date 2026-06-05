@@ -48,6 +48,7 @@ export default function WeeklyProfit() {
         <StatCard label="Net Profit" value={money(summary.net_profit)} />
         <StatCard label="Sales" value={money(summary.sales)} />
         <StatCard label="Return Loss" value={money(summary.return_loss)} />
+        <StatCard label="RTO Loss" value={money(summary.rto_loss)} />
         <StatCard label="Margin" value={`${summary.profit_margin_percent}%`} />
         <StatCard label="Status" value={summary.status} />
       </section>
@@ -83,7 +84,7 @@ export default function WeeklyProfit() {
           <h2 className="mb-3 text-xl font-black">Weekly Profit/Loss</h2>
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-slate-500">
-              <tr><th className="py-2">Week</th><th>Sales</th><th>Profit</th><th>Return Loss</th><th>Net</th><th>Status</th></tr>
+              <tr><th className="py-2">Week</th><th>Sales</th><th>Profit</th><th>Return Loss</th><th>RTO Loss</th><th>Net</th><th>Status</th></tr>
             </thead>
             <tbody>
               {(data.weeks || []).map((week) => (
@@ -92,6 +93,7 @@ export default function WeeklyProfit() {
                   <td>{money(week.sales)}</td>
                   <td>{money(week.delivered_profit)}</td>
                   <td>{money(week.return_loss)}</td>
+                  <td>{money(week.rto_loss)}</td>
                   <td className={week.net_profit < 0 ? "font-bold text-red-700" : "font-bold text-emerald-700"}>{money(week.net_profit)}</td>
                   <td><Badge tone={week.net_profit >= 0 ? "safe" : "risk"}>{week.status}</Badge></td>
                 </tr>
@@ -106,7 +108,7 @@ export default function WeeklyProfit() {
         <h2 className="mb-3 text-xl font-black">SKU Profit Ranking</h2>
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-slate-500">
-            <tr><th className="py-2">SKU</th><th>Sales</th><th>Return Loss</th><th>Net</th><th>Returned</th><th>Status</th></tr>
+            <tr><th className="py-2">SKU</th><th>Sales</th><th>Return Loss</th><th>RTO Loss</th><th>Net</th><th>Returned</th><th>RTO</th><th>Status</th></tr>
           </thead>
           <tbody>
             {(data.sku_profit || []).map((item) => (
@@ -114,8 +116,10 @@ export default function WeeklyProfit() {
                 <td className="py-3 font-semibold">{item.sku}<span className="block text-xs font-normal text-slate-500">{item.product_name}</span></td>
                 <td>{money(item.sales)}</td>
                 <td>{money(item.return_loss)}</td>
+                <td>{money(item.rto_loss)}</td>
                 <td className={item.net_profit < 0 ? "font-bold text-red-700" : "font-bold text-emerald-700"}>{money(item.net_profit)}</td>
                 <td>{item.returned_orders}</td>
+                <td>{item.rto_orders}</td>
                 <td><Badge tone={item.net_profit >= 0 ? "safe" : "risk"}>{item.status}</Badge></td>
               </tr>
             ))}

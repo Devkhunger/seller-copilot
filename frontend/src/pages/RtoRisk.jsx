@@ -19,12 +19,30 @@ export default function RtoRisk() {
         <RiskTable title="High-Risk SKUs" items={risk.high_risk_skus} columns={["sku"]} />
         <RiskTable title="State + SKU Risk" items={risk.high_risk_combos} columns={["customer_state", "sku"]} />
       </section>
-      <section className="card mt-5">
-        <h2 className="text-xl font-black">Promotion Insights</h2>
-        <div className="mt-3 grid gap-2">
-          {(recs?.insights || []).map((insight) => <p key={insight} className="rounded-lg bg-slate-50 p-3">{insight}</p>)}
-          {!recs?.insights?.length && <p className="text-slate-500">No high-risk insight yet. Upload more orders for better signals.</p>}
+      <section className="mt-5 grid gap-5 xl:grid-cols-[1fr_360px]">
+        <div className="card">
+          <h2 className="text-xl font-black">Promotion Insights</h2>
+          <div className="mt-3 grid gap-2">
+            {(recs?.insights || []).map((insight) => <p key={insight} className="rounded-lg bg-slate-50 p-3">{insight}</p>)}
+            {!recs?.insights?.length && <p className="text-slate-500">No high-risk insight yet. Upload more orders for better signals.</p>}
+          </div>
         </div>
+
+        <aside className="card">
+          <h2 className="text-xl font-black">Run Ads On</h2>
+          {recs?.ad_recommendation ? (
+            <div className="mt-3 grid gap-3">
+              <p className="rounded-lg bg-emerald-50 p-3 text-emerald-900">
+                Promote <span className="font-bold">{recs.ad_recommendation.product_name}</span> ({recs.ad_recommendation.sku})
+              </p>
+              <p className="text-sm leading-6 text-slate-700">Target: <span className="font-semibold">{recs.ad_recommendation.recommended_state}</span></p>
+              <p className="text-sm leading-6 text-slate-700">Why: {recs.ad_recommendation.reason}</p>
+              <p className="text-sm leading-6 text-slate-700">Confidence: {recs.ad_recommendation.confidence}</p>
+            </div>
+          ) : (
+            <p className="mt-3 text-slate-500">Upload more orders so we can pick a SKU to promote with ads.</p>
+          )}
+        </aside>
       </section>
     </>
   );

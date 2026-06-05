@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import pandas as pd
@@ -5,9 +6,12 @@ import pandas as pd
 from app.database import get_db
 
 
-def load_orders_df() -> pd.DataFrame:
+def load_orders_df(seller_email: str | None = None) -> pd.DataFrame:
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM order_rows").fetchall()
+        if seller_email:
+            rows = conn.execute("SELECT * FROM order_rows WHERE seller_email = ?", (seller_email,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM order_rows").fetchall()
     df = pd.DataFrame([dict(row) for row in rows])
     if df.empty:
         return pd.DataFrame(
@@ -21,6 +25,7 @@ def load_orders_df() -> pd.DataFrame:
                 "listed_price",
                 "discounted_price",
                 "quantity",
+                "seller_email",
             ]
         )
     df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(1)
@@ -38,16 +43,19 @@ def status_mask(df: pd.DataFrame, kind: str) -> pd.Series:
         return status.str.contains("CANCELLED", na=False)
     if kind == "rto":
         return status.str.contains("RTO", na=False)
+    if kind == "return":
+        return status.str.contains("RETURN", na=False) & ~status.str.contains("RTO", na=False)
     known = (
         status.str.contains("DELIVERED", na=False)
         | status.str.contains("CANCELLED", na=False)
         | status.str.contains("RTO", na=False)
+        | (status.str.contains("RETURN", na=False) & ~status.str.contains("RTO", na=False))
     )
     return ~known
 
 
-def dashboard_metrics() -> dict:
-    df = load_orders_df()
+def dashboard_metrics(seller_email: str | None = None) -> dict:
+    df = load_orders_df(seller_email)
     if df.empty:
         return _empty_dashboard()
 
@@ -77,8 +85,8 @@ def dashboard_metrics() -> dict:
     }
 
 
-def calculate_sku_scores(df: pd.DataFrame | None = None) -> list[dict]:
-    df = load_orders_df() if df is None else df
+def calculate_sku_scores(df: pd.DataFrame | None = None, seller_email: str | None = None) -> list[dict]:
+    df = load_orders_df(seller_email) if df is None else df
     if df.empty:
         return []
     max_volume = max(float(df.groupby("sku")["quantity"].sum().max()), 1)
@@ -110,8 +118,8 @@ def calculate_sku_scores(df: pd.DataFrame | None = None) -> list[dict]:
     return sorted(rows, key=lambda item: item["score"], reverse=True)
 
 
-def rto_risk_analysis() -> dict:
-    df = load_orders_df()
+def rto_risk_analysis(seller_email: str | None = None) -> dict:
+    df = load_orders_df(seller_email)
     if df.empty:
         return {"high_risk_states": [], "high_risk_skus": [], "high_risk_combos": [], "source_rto": []}
     return {
@@ -149,8 +157,8 @@ def _risk_table(df: pd.DataFrame, group_cols: list[str], minimum_orders: int = 5
     return sorted(rows, key=lambda item: item["rto_rate"], reverse=True)
 
 
-def safe_state_sku_combos() -> list[dict]:
-    df = load_orders_df()
+def safe_state_sku_combos(seller_email: str | None = None) -> list[dict]:
+    df = load_orders_df(seller_email)
     if df.empty:
         return []
     combos = _risk_table(df, ["customer_state", "sku"], minimum_orders=3, high_risk_only=False)
@@ -160,8 +168,8 @@ def safe_state_sku_combos() -> list[dict]:
     ][:5]
 
 
-def average_daily_orders_by_sku() -> dict[str, float]:
-    df = load_orders_df()
+def average_daily_orders_by_sku(seller_email: str | None = None) -> dict[str, float]:
+    df = load_orders_df(seller_email)
     if df.empty:
         return {}
     result = {}
@@ -191,4 +199,3 @@ def _empty_dashboard() -> dict:
         "natural_orders": 0,
         "order_source_breakdown": {},
     }
-

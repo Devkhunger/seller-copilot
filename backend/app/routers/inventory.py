@@ -1,6 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.database import log_usage
+from app.auth import get_current_user
 from app.schemas import InventoryUpdate
 from app.services.inventory import inventory_report, upsert_inventory
 
@@ -8,13 +8,10 @@ router = APIRouter(prefix="/api", tags=["inventory"])
 
 
 @router.get("/inventory")
-def get_inventory():
-    return {"items": inventory_report()}
+def get_inventory(current_user: dict = Depends(get_current_user)):
+    return {"items": inventory_report(current_user["email"])}
 
 
 @router.post("/inventory")
-def post_inventory(payload: InventoryUpdate):
-    result = upsert_inventory(payload.sku, payload.current_stock)
-    log_usage("inventory_updated", f"{payload.sku}: {payload.current_stock}")
-    return result
-
+def save_inventory(payload: InventoryUpdate, current_user: dict = Depends(get_current_user)):
+    return upsert_inventory(payload.sku, payload.current_stock, current_user["email"])

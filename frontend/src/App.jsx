@@ -1,3 +1,4 @@
+
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -16,7 +17,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
-      <Route element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+      <Route element={<Layout />}> 
         <Route path="/upload" element={<Upload />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/sku-score" element={<SkuScore />} />
