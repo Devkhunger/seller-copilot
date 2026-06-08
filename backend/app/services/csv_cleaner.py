@@ -69,6 +69,8 @@ def clean_csv_upload(file_bytes: bytes) -> tuple[pd.DataFrame, list[str]]:
     cleaned["discounted_price"] = _safe_money(cleaned["discounted_price"])
     cleaned["quantity"] = pd.to_numeric(cleaned["quantity"], errors="coerce").fillna(1).clip(lower=1).astype(int)
     cleaned = cleaned[cleaned["sku"].astype(str).str.len() > 0].copy()
+    cleaned["_order_date_sort"] = pd.to_datetime(cleaned["order_date"], errors="coerce")
+    cleaned = cleaned.sort_values("_order_date_sort", kind="mergesort", na_position="last").drop(columns=["_order_date_sort"])
     return cleaned[CANONICAL_COLUMNS], warnings
 
 

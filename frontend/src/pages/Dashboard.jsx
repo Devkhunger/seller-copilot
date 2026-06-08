@@ -23,6 +23,7 @@ export default function Dashboard() {
   if (error) return <p className="card text-red-700">{error}</p>;
   if (!data) return <p className="card">Loading dashboard...</p>;
   const m = data.metrics;
+  const weeklyRitual = getWeeklyRitual();
   const chartData = [
     { name: "Delivered", orders: m.delivered_orders },
     { name: "Cancelled", orders: m.cancelled_orders },
@@ -38,6 +39,19 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="Dashboard">What should I do today to increase profitable orders and reduce losses?</PageHeader>
+      <section className="mb-5 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-amber-50 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-emerald-700">Weekly ritual</p>
+            <h2 className="mt-1 text-lg font-black text-slate-900">Upload the week’s report every Sunday evening</h2>
+            <p className="mt-1 text-sm text-slate-600">Then review three recommendations before planning restocks or ad spend.</p>
+          </div>
+          <div className="grid gap-2 text-sm text-slate-700 md:text-right">
+            <p><span className="font-bold">Next review:</span> {weeklyRitual.nextReview}</p>
+            <p><span className="font-bold">Focus:</span> {weeklyRitual.focus}</p>
+          </div>
+        </div>
+      </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total Orders" value={m.total_orders} />
         <StatCard label="Delivered" value={m.delivered_orders} />
@@ -118,3 +132,22 @@ export default function Dashboard() {
 function money(value) {
   return `₹${Math.round(value || 0).toLocaleString("en-IN")}`;
 }
+
+function getWeeklyRitual() {
+  const today = new Date();
+  const dayIndex = today.getDay();
+  const daysUntilSunday = (7 - dayIndex) % 7 || 7;
+  const nextSunday = new Date(today);
+  nextSunday.setDate(today.getDate() + daysUntilSunday);
+  const formatter = new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+
+  return {
+    nextReview: formatter.format(nextSunday),
+    focus: "Three insights, one action list, one restock decision",
+  };
+}
+

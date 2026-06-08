@@ -1,0 +1,71 @@
+Recent Changes
+
+1. Listing Doctor keyword handling
+- Kept the keyword list as a separate output.
+- Updated SEO title and short description to explicitly include keyword focus.
+- Made the backend fallback listing also include a primary keyword in the title and description.
+- Updated platform guidance so it says to include searchable keywords in the title, description, bullets, and images.
+- Updated the frontend labels to show that the SEO title and short description include keywords.
+
+2. Listing Doctor trend wording
+- Changed trend note wording from generic language to clearer keyword-focused wording.
+- Made the listing output say "Trending keyword focus" in the bullet section.
+
+3. SKU score improvements
+- Expanded SKU scoring beyond delivered rate, RTO, and cancellation.
+- Added natural vs ad traffic mix.
+- Added discount pressure.
+- Added freshness or recency.
+- Added momentum.
+- Added consistency across order days.
+- Added state diversity as a small positive signal.
+- Exposed the new score fields in the SKU Score table UI.
+
+4. Recommendation rule updates
+- Updated promote rules to prefer high score, low RTO, healthy natural demand, and recent activity.
+- Updated pause rules to catch high ad dependence and weak natural share.
+- Updated listing improvement rules to catch weak freshness and heavy discounting.
+- Updated recommendation messages so they explain the richer signals.
+
+5. Weekly Growth Planner improvements
+- Expanded the sales planner feature set to include natural share, discount percentage, and freshness signals.
+- Kept the existing time-based features like lag, rolling averages, weekday, and price.
+- Updated planner notes so the UI explains the richer model inputs.
+- Added a Model Notes section to the Growth Planner page so the user can see the current modeling notes.
+
+6. Stability and data handling
+- Hardened new score calculations against missing values.
+- Added helper logic so averages stay numeric even when some rows are empty or messy.
+- Verified the backend Python files compile after the edits.
+7. Historical upload retention and time ordering
+- Kept uploaded order rows instead of replacing the previous dataset on each upload.
+- Sorted uploaded rows by order date before storing them.
+- Sorted loaded order history by date so models read the oldest rows first.
+- Changed RTO training features to use only prior rows when building historical rates.
+- Added regression tests to lock in the chronological upload and model behavior.
+8. Growth Planner seasonal signals
+- Added festive-season and peak-sale-season flags to the 14-day demand forecast.
+- Added quarter, ISO week, and days-to-month-end features for stronger seasonality awareness.
+- Kept the forecast focused on historical sales speed, price, discount, traffic mix, and freshness.
+- Verified the backend tests still pass after the feature update.
+9. Sale-day awareness for forecasting
+- Added an explicit sale-context signal so the Growth Planner can treat platform sale spikes separately from normal demand.
+- Added sale intensity plus festive and peak-sale flags to future forecast rows as well as training rows.
+- Kept the forecast tied to historical order speed, pricing, discounting, traffic mix, and freshness so sale spikes do not look like pure organic growth.
+10. Weekly profit trend view
+- Added week-over-week profit change values to the weekly profit report.
+- Added a profit trend chart so users can see whether net profit is rising or falling.
+- Kept the weekly profit table and SKU ranking intact for detailed analysis.
+11. Weekly profit action summary
+- Added a plain-language action summary above the weekly profit chart.
+- Highlighted the latest week shift, best week, and worst week in one place.
+- Added quick next-step guidance so sellers can react faster to profit changes.
+12. Weekly profit drivers panel
+- Added top profit drivers and top loss drivers panels to the Weekly Profit page.
+- Reused existing SKU profit data so the summary stays fast and easy to explain.
+- Kept the main profit trend chart and table so users can still inspect the details.
+13. Dashboard weekly ritual
+- Added a Sunday upload reminder banner on the Dashboard.
+- Showed the next review date and the weekly focus so the workflow feels repeatable.
+- Kept the reminder lightweight so it supports the existing dashboard instead of crowding it.
+

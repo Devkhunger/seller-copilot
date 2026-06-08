@@ -32,7 +32,10 @@ def load_orders_df(seller_email: str | None = None) -> pd.DataFrame:
     df["discounted_price"] = pd.to_numeric(df["discounted_price"], errors="coerce").fillna(0)
     df["listed_price"] = pd.to_numeric(df["listed_price"], errors="coerce").fillna(0)
     df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
-    return df
+    sort_cols = ["order_date"]
+    if "id" in df.columns:
+        sort_cols.append("id")
+    return df.sort_values(sort_cols, kind="mergesort", na_position="last").reset_index(drop=True)
 
 
 def status_mask(df: pd.DataFrame, kind: str) -> pd.Series:
@@ -89,9 +92,17 @@ def calculate_sku_scores(df: pd.DataFrame | None = None, seller_email: str | Non
     df = load_orders_df(seller_email) if df is None else df
     if df.empty:
         return []
-    max_volume = max(float(df.groupby("sku")["quantity"].sum().max()), 1)
+
+    work = df.copy()
+    work["order_date"] = pd.to_datetime(work["order_date"], errors="coerce")
+    work["discount_pct"] = work.apply(_discount_pct, axis=1)
+    work["is_paid_source"] = _paid_source_mask(work).astype(int)
+
+    max_volume = max(float(work.groupby("sku")["quantity"].sum().max()), 1)
+    latest_day = work["order_date"].dropna().max()
     rows: list[dict] = []
-    for sku, group in df.groupby("sku"):
+
+    for sku, group in work.groupby("sku"):
         orders = int(group["quantity"].sum())
         delivered = int(group.loc[status_mask(group, "delivered"), "quantity"].sum())
         cancelled = int(group.loc[status_mask(group, "cancelled"), "quantity"].sum())
@@ -100,8 +111,36 @@ def calculate_sku_scores(df: pd.DataFrame | None = None, seller_email: str | Non
         cancellation_rate = cancelled / max(orders, 1)
         rto_rate = rto / max(orders, 1)
         normalized_order_volume = orders / max_volume
-        score = 50 + delivered_rate * 30 + normalized_order_volume * 20 - rto_rate * 25 - cancellation_rate * 15
+
+        ad_orders = int(group.loc[group["is_paid_source"].astype(bool), "quantity"].sum())
+        natural_orders = orders - ad_orders
+        ad_share_pct = (ad_orders / max(orders, 1)) * 100
+        natural_share_pct = 100 - ad_share_pct
+
+        discount_mean = group["discount_pct"].mean()
+        avg_discount_pct = float(discount_mean) if not pd.isna(discount_mean) else 0.0
+        recency_score = _recency_score(latest_day, group["order_date"].dropna().max())
+        momentum_score = _momentum_score(group, latest_day)
+        consistency_score = _consistency_score(group)
+        state_diversity = _state_diversity_score(group)
+        discount_pressure = min(100.0, max(0.0, avg_discount_pct))
+
+        score = (
+            18
+            + (delivered_rate * 22)
+            + (normalized_order_volume * 12)
+            + (natural_share_pct * 0.08)
+            + (recency_score * 0.10)
+            + (momentum_score * 0.10)
+            + (consistency_score * 0.06)
+            + (state_diversity * 4)
+            - (rto_rate * 0.18)
+            - (cancellation_rate * 0.10)
+            - (ad_share_pct * 0.04)
+            - (discount_pressure * 0.05)
+        )
         score = max(0, min(100, round(score)))
+
         rows.append(
             {
                 "sku": sku,
@@ -110,12 +149,78 @@ def calculate_sku_scores(df: pd.DataFrame | None = None, seller_email: str | Non
                 "delivered_rate": round(delivered_rate * 100, 1),
                 "cancelled_rate": round(cancellation_rate * 100, 1),
                 "rto_rate": round(rto_rate * 100, 1),
+                "natural_orders": natural_orders,
+                "ad_orders": ad_orders,
+                "natural_share_pct": round(natural_share_pct, 1),
+                "ad_share_pct": round(ad_share_pct, 1),
+                "avg_discount_pct": round(avg_discount_pct, 1),
+                "recency_score": round(recency_score, 1),
+                "momentum_score": round(momentum_score, 1),
+                "consistency_score": round(consistency_score, 1),
+                "state_diversity_score": round(state_diversity, 1),
                 "score": score,
                 "action": "Push" if score >= 75 else "Watch" if score >= 45 else "Pause",
-                "natural_orders": int(group[~group["order_source"].astype(str).str.lower().str.contains("ad|paid|sponsored", na=False)]["quantity"].sum()),
             }
         )
     return sorted(rows, key=lambda item: item["score"], reverse=True)
+
+
+def _paid_source_mask(df: pd.DataFrame) -> pd.Series:
+    return df["order_source"].fillna("").astype(str).str.lower().str.contains("ad|paid|sponsored", na=False)
+
+
+def _discount_pct(row) -> float:
+    listed = float(row.get("listed_price") or 0)
+    discounted = float(row.get("discounted_price") or 0)
+    if listed <= 0:
+        return 0.0
+    return max(0.0, min(100.0, ((listed - discounted) / listed) * 100))
+
+
+def _recency_score(latest_day, last_order_day) -> float:
+    if pd.isna(latest_day) or pd.isna(last_order_day):
+        return 50.0
+    days_since = max(0, int((latest_day.normalize() - last_order_day.normalize()).days))
+    return max(0.0, min(100.0, 100.0 / (1.0 + (days_since / 14.0))))
+
+
+def _momentum_score(group: pd.DataFrame, latest_day) -> float:
+    dated = group.dropna(subset=["order_date"]).copy()
+    if dated.empty or pd.isna(latest_day):
+        return 50.0
+    recent_start = latest_day.normalize() - pd.Timedelta(days=13)
+    previous_start = latest_day.normalize() - pd.Timedelta(days=27)
+    recent_orders = float(dated.loc[dated["order_date"] >= recent_start, "quantity"].sum())
+    previous_orders = float(dated.loc[(dated["order_date"] < recent_start) & (dated["order_date"] >= previous_start), "quantity"].sum())
+    if recent_orders <= 0 and previous_orders <= 0:
+        return 50.0
+    if previous_orders <= 0:
+        return 75.0 if recent_orders > 0 else 50.0
+    change = (recent_orders - previous_orders) / max(previous_orders, recent_orders, 1.0)
+    return max(0.0, min(100.0, 50.0 + (change * 50.0)))
+
+
+def _consistency_score(group: pd.DataFrame) -> float:
+    dated = group.dropna(subset=["order_date"]).copy()
+    if dated.empty:
+        return 50.0
+    daily = dated.groupby(dated["order_date"].dt.normalize())["quantity"].sum()
+    if len(daily) < 2:
+        return 60.0 if len(daily) == 1 else 50.0
+    mean = float(daily.mean())
+    if mean <= 0:
+        return 50.0
+    cv = float(daily.std(ddof=0)) / mean
+    return max(0.0, min(100.0, 100.0 / (1.0 + cv)))
+
+
+def _state_diversity_score(group: pd.DataFrame) -> float:
+    states = group["customer_state"].fillna("").astype(str).str.strip()
+    states = states[states != ""]
+    if states.empty:
+        return 50.0
+    unique_states = states.nunique()
+    return max(0.0, min(100.0, (unique_states / 5.0) * 100.0))
 
 
 def rto_risk_analysis(seller_email: str | None = None) -> dict:

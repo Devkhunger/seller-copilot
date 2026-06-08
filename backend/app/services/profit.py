@@ -68,7 +68,36 @@ def weekly_profit_report(seller_email: str | None = None) -> dict:
     for week, group in merged.groupby("week_start"):
         row = _group_profit_row(group, "week_start", week)
         weeks.append(row)
-    weeks = sorted(weeks, key=lambda item: item["week_start"], reverse=True)
+    weeks = sorted(weeks, key=lambda item: item["week_start"])
+
+    week_trend = []
+    previous_net_profit = None
+    for row in weeks:
+        current_net_profit = float(row["net_profit"])
+        if previous_net_profit is None:
+            change_value = None
+            change_percent = None
+            trend = "New"
+        else:
+            change_value = round(current_net_profit - previous_net_profit, 2)
+            change_percent = _percent(change_value, abs(previous_net_profit)) if previous_net_profit else 0.0
+            if change_value > 0:
+                trend = "Up"
+            elif change_value < 0:
+                trend = "Down"
+            else:
+                trend = "Flat"
+        week_trend.append(
+            {
+                "week_start": row["week_start"],
+                "net_profit": current_net_profit,
+                "change_value": change_value,
+                "change_percent": change_percent,
+                "trend": trend,
+            }
+        )
+        previous_net_profit = current_net_profit
+    latest_week_change = week_trend[-1] if week_trend else None
 
     sku_profit = []
     for sku, group in merged.groupby("sku"):
@@ -84,7 +113,9 @@ def weekly_profit_report(seller_email: str | None = None) -> dict:
     return {
         "settings": settings,
         "summary": summary,
-        "weeks": weeks[:12],
+        "weeks": sorted(weeks, key=lambda item: item["week_start"], reverse=True)[:12],
+        "week_trend": week_trend[-12:],
+        "latest_week_change": latest_week_change,
         "sku_profit": sku_profit,
         "explanation": [
             "Delivered orders count sales after estimated product cost, marketplace fee, shipping, and ad cost.",
