@@ -85,8 +85,18 @@ def demand_forecast(df: pd.DataFrame | None = None) -> dict:
         "day_of_week",
         "day_of_month",
         "month",
+        "quarter",
+        "week_of_year",
+        "days_to_month_end",
+        "sale_context",
+        "sale_intensity",
+        "is_festive_season",
+        "is_peak_sale_season",
         "source_paid_share",
+        "natural_share",
         "avg_price",
+        "avg_discount_pct",
+        "days_since_last_order",
         "orders_lag_1",
         "orders_lag_7",
         "rolling_7_orders",
@@ -139,7 +149,7 @@ def demand_forecast(df: pd.DataFrame | None = None) -> dict:
 
     return {
         "items": sorted(items, key=lambda item: item["forecast_units"], reverse=True),
-        "notes": ["Sales plan now uses recent sales speed, weekday, price, and ad-share signals."],
+        "notes": ["Sales plan now uses recent sales speed, weekday, price, ad-share, discount, freshness, festive-season, and sale-context signals."],
         "quality": quality,
     }
 
@@ -278,28 +288,53 @@ def _engine_status() -> dict:
     }
 
 
+def _sale_context_for_day(day: pd.Timestamp) -> tuple[str, float, int, int]:
+    month = int(day.month)
+    day_of_month = int(day.day)
+    if month in [10, 11] or (month == 12 and day_of_month >= 15) or month == 1:
+        return "platform_sale", 1.0, 1, 1
+    if month in [8, 9]:
+        return "festive_preheat", 0.7, 1, 0
+    if month in [2, 3, 4, 5, 6, 7]:
+        return "normal", 0.0, 0, 0
+    return "normal", 0.0, 0, 0
+
+
 def _daily_sku_orders(df: pd.DataFrame) -> pd.DataFrame:
     work = df.dropna(subset=["order_date"]).copy()
     if work.empty:
         return pd.DataFrame()
     work["order_day"] = work["order_date"].dt.floor("D")
     work["is_paid"] = work["order_source"].fillna("").astype(str).str.lower().str.contains("ad|paid|sponsored", na=False).astype(float)
+    work["discount_pct"] = work.apply(_discount_pct, axis=1)
     grouped = work.groupby(["sku", "order_day"]).agg(
         quantity=("quantity", "sum"),
         source_paid_share=("is_paid", "mean"),
         avg_price=("discounted_price", "mean"),
+        avg_discount_pct=("discount_pct", "mean"),
     ).reset_index()
     grouped = grouped.sort_values(["sku", "order_day"])
     grouped["day_of_week"] = grouped["order_day"].dt.dayofweek
     grouped["day_of_month"] = grouped["order_day"].dt.day
     grouped["month"] = grouped["order_day"].dt.month
+    grouped["quarter"] = grouped["order_day"].dt.quarter
+    grouped["week_of_year"] = grouped["order_day"].dt.isocalendar().week.astype(int)
+    grouped["days_to_month_end"] = (grouped["order_day"].dt.days_in_month - grouped["day_of_month"]).astype(int)
+    sale_context = grouped["order_day"].apply(_sale_context_for_day)
+    grouped["sale_context"] = sale_context.apply(lambda item: item[0])
+    grouped["sale_intensity"] = sale_context.apply(lambda item: float(item[1]))
+    grouped["is_festive_season"] = sale_context.apply(lambda item: int(item[2]))
+    grouped["is_peak_sale_season"] = sale_context.apply(lambda item: int(item[3]))
     grouped["avg_price"] = grouped["avg_price"].fillna(0)
+    grouped["avg_discount_pct"] = grouped["avg_discount_pct"].fillna(0)
+    grouped["natural_share"] = (1 - grouped["source_paid_share"]).clip(lower=0, upper=1)
     grouped["orders_lag_1"] = grouped.groupby("sku")["quantity"].shift(1).fillna(0)
     grouped["orders_lag_7"] = grouped.groupby("sku")["quantity"].shift(7).fillna(0)
     grouped["rolling_7_orders"] = grouped.groupby("sku")["quantity"].transform(lambda item: item.shift(1).rolling(7, min_periods=1).mean()).fillna(0)
     grouped["rolling_14_orders"] = grouped.groupby("sku")["quantity"].transform(lambda item: item.shift(1).rolling(14, min_periods=1).mean()).fillna(0)
     grouped["sku_total_orders"] = grouped.groupby("sku")["quantity"].transform("sum")
     grouped["sku_active_days"] = grouped.groupby("sku")["order_day"].transform("count")
+    grouped["days_since_last_order"] = grouped.groupby("sku")["order_day"].diff().dt.days.fillna(0)
     return grouped
 
 
@@ -308,14 +343,17 @@ def _future_sku_days(daily: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for sku, group in daily.groupby("sku"):
         group = group.sort_values("order_day")
-        paid_share = float(group["source_paid_share"].tail(7).mean())
-        avg_price = float(group["avg_price"].replace(0, pd.NA).dropna().tail(7).mean() or group["avg_price"].mean() or 0)
+        paid_share = _safe_mean(group["source_paid_share"].tail(7), default=0.0)
+        avg_price = _safe_mean(group["avg_price"].replace(0, pd.NA).dropna().tail(7), default=_safe_mean(group["avg_price"], default=0.0))
+        avg_discount_pct = _safe_mean(group["avg_discount_pct"].tail(7), default=0.0)
         lag_1 = float(group["quantity"].iloc[-1])
         lag_7 = float(group["quantity"].iloc[-7]) if len(group) >= 7 else 0
         rolling_7 = float(group["quantity"].tail(7).mean())
         rolling_14 = float(group["quantity"].tail(14).mean())
         sku_total_orders = float(group["quantity"].sum())
         sku_active_days = int(len(group))
+        natural_share = max(0.0, 1.0 - paid_share)
+        days_since_last_order = float((latest_day - group["order_day"].iloc[-1]).days) if len(group) else 0
         for offset in range(1, FORECAST_DAYS + 1):
             day = latest_day + pd.Timedelta(days=offset)
             rows.append(
@@ -325,8 +363,18 @@ def _future_sku_days(daily: pd.DataFrame) -> pd.DataFrame:
                     "day_of_week": day.dayofweek,
                     "day_of_month": day.day,
                     "month": day.month,
+                    "quarter": day.quarter,
+                    "week_of_year": int(day.isocalendar().week),
+                    "days_to_month_end": day.days_in_month - day.day,
+                    "sale_context": _sale_context_for_day(day)[0],
+                    "sale_intensity": _sale_context_for_day(day)[1],
+                    "is_festive_season": _sale_context_for_day(day)[2],
+                    "is_peak_sale_season": _sale_context_for_day(day)[3],
                     "source_paid_share": paid_share,
+                    "natural_share": natural_share,
                     "avg_price": avg_price,
+                    "avg_discount_pct": avg_discount_pct,
+                    "days_since_last_order": days_since_last_order,
                     "orders_lag_1": lag_1,
                     "orders_lag_7": lag_7,
                     "rolling_7_orders": rolling_7,
@@ -341,19 +389,29 @@ def _future_sku_days(daily: pd.DataFrame) -> pd.DataFrame:
 def _rto_training_rows(df: pd.DataFrame) -> pd.DataFrame:
     rows = df.copy()
     rows["order_date"] = pd.to_datetime(rows["order_date"], errors="coerce")
+    rows["sku"] = rows["sku"].fillna("").astype(str).str.strip()
+    rows["customer_state"] = rows["customer_state"].fillna("").astype(str).str.strip()
+    rows["order_source"] = rows["order_source"].fillna("").astype(str).str.strip()
+    rows = rows.sort_values(["order_date", "sku", "customer_state", "order_source"], kind="mergesort", na_position="last").reset_index(drop=True)
     rows["price"] = rows["discounted_price"].fillna(0)
     rows["discount_pct"] = rows.apply(_discount_pct, axis=1)
     rows["is_rto"] = status_mask(rows, "rto").astype(int)
-    rows["is_paid_source"] = rows["order_source"].fillna("").astype(str).str.lower().str.contains("ad|paid|sponsored", na=False).astype(int)
-    rows["sku_order_count"] = rows.groupby("sku")["sku"].transform("count")
-    rows["state_order_count"] = rows.groupby("customer_state")["customer_state"].transform("count")
-    global_rto = float(rows["is_rto"].mean())
-    sku_rates = rows.groupby("sku")["is_rto"].mean()
-    state_rates = rows.groupby("customer_state")["is_rto"].mean()
-    combo_rates = rows.groupby(["sku", "customer_state"])["is_rto"].mean()
-    rows["sku_historical_rto_rate"] = rows["sku"].map(sku_rates).fillna(global_rto)
-    rows["state_historical_rto_rate"] = rows["customer_state"].map(state_rates).fillna(global_rto)
-    rows["sku_state_historical_rto_rate"] = rows.apply(lambda row: combo_rates.get((row["sku"], row["customer_state"]), global_rto), axis=1)
+    rows["is_paid_source"] = rows["order_source"].astype(str).str.lower().str.contains("ad|paid|sponsored", na=False).astype(int)
+
+    rows["sku_order_count"] = rows.groupby("sku").cumcount()
+    rows["state_order_count"] = rows.groupby("customer_state").cumcount()
+    rows["combo_order_count"] = rows.groupby(["sku", "customer_state"]).cumcount()
+    rows["global_order_count"] = pd.Series(range(len(rows)), index=rows.index, dtype="float")
+
+    rows["global_prior_rto_count"] = rows["is_rto"].cumsum().shift(1).fillna(0)
+    rows["sku_prior_rto_count"] = rows.groupby("sku")["is_rto"].transform(lambda series: series.cumsum().shift(1).fillna(0))
+    rows["state_prior_rto_count"] = rows.groupby("customer_state")["is_rto"].transform(lambda series: series.cumsum().shift(1).fillna(0))
+    rows["combo_prior_rto_count"] = rows.groupby(["sku", "customer_state"])["is_rto"].transform(lambda series: series.cumsum().shift(1).fillna(0))
+
+    prior_global_rate = rows["global_prior_rto_count"] / rows["global_order_count"].replace(0, pd.NA)
+    rows["sku_historical_rto_rate"] = (rows["sku_prior_rto_count"] / rows["sku_order_count"].replace(0, pd.NA)).fillna(prior_global_rate).fillna(0.0)
+    rows["state_historical_rto_rate"] = (rows["state_prior_rto_count"] / rows["state_order_count"].replace(0, pd.NA)).fillna(prior_global_rate).fillna(0.0)
+    rows["sku_state_historical_rto_rate"] = (rows["combo_prior_rto_count"] / rows["combo_order_count"].replace(0, pd.NA)).fillna(prior_global_rate).fillna(0.0)
     columns = [
         "order_date",
         "sku",
@@ -370,7 +428,7 @@ def _rto_training_rows(df: pd.DataFrame) -> pd.DataFrame:
         "is_paid_source",
         "is_rto",
     ]
-    return rows[columns].fillna("")
+    return rows[columns]
 
 
 def _time_train_test_split(df: pd.DataFrame, date_col: str) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -405,6 +463,11 @@ def _encode_features(df: pd.DataFrame, feature_cols: list[str]):
     encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
     encoded = encoder.fit_transform(df[feature_cols])
     return encoder, encoded
+
+
+def _safe_mean(series, default: float = 0.0) -> float:
+    value = series.mean() if hasattr(series, "mean") else default
+    return float(default if pd.isna(value) else value)
 
 
 def _discount_pct(row) -> float:

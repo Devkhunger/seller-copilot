@@ -19,7 +19,6 @@ async def upload_csv(file: UploadFile = File(...), current_user: dict = Depends(
     seller_email = current_user["email"]
 
     with get_db() as conn:
-        conn.execute("DELETE FROM order_rows WHERE seller_email = ?", (seller_email,))
         conn.execute("DELETE FROM actions WHERE seller_email = ? AND done = 0", (seller_email,))
         rows = cleaned.copy()
         rows.insert(0, "seller_email", seller_email)
