@@ -1,10 +1,9 @@
-
 from __future__ import annotations
 
-import pandas as pd
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 from app.database import get_db
-from app.services.analytics import load_orders_df, status_mask
 
 
 DEFAULT_SETTINGS = {
@@ -16,196 +15,146 @@ DEFAULT_SETTINGS = {
 }
 
 
-def get_profit_settings(seller_email: str | None = None) -> dict:
-    settings = DEFAULT_SETTINGS.copy()
-    if not seller_email:
-        return settings
+def _orders(seller_email: str | None = None) -> list[dict]:
     with get_db() as conn:
-        rows = conn.execute("SELECT key, value FROM profit_settings WHERE seller_email = ?", (seller_email,)).fetchall()
+        rows = conn.execute(
+            """
+            SELECT order_date, sku, product_name, status, discounted_price, listed_price, quantity
+            FROM order_rows
+            WHERE seller_email = ?
+            ORDER BY date(order_date) ASC, id ASC
+            """,
+            (seller_email or "demo@seller-copilot.local",),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _status_bucket(status: str) -> str:
+    token = (status or "").strip().upper()
+    if token in {"DELIVERED", "SUCCESS", "COMPLETED"}:
+        return "delivered"
+    if token in {"RTO", "RETURN TO ORIGIN"}:
+        return "rto"
+    if token in {"RETURNED", "RETURN"}:
+        return "returned"
+    if token in {"CANCELLED", "CANCELED", "CANCEL"}:
+        return "cancelled"
+    return "other"
+
+
+def _load_settings(seller_email: str | None = None) -> dict[str, float]:
+    settings = dict(DEFAULT_SETTINGS)
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT key, value FROM profit_settings WHERE seller_email = ?",
+            (seller_email or "demo@seller-copilot.local",),
+        ).fetchall()
     for row in rows:
-        if row["key"] in settings:
-            settings[row["key"]] = float(row["value"])
+        settings[row["key"]] = float(row["value"])
     return settings
 
 
-def save_profit_settings(payload: dict, seller_email: str | None = None) -> dict:
-    settings = get_profit_settings(seller_email)
-    for key in settings:
-        if key in payload and payload[key] is not None:
-            settings[key] = max(0, float(payload[key]))
-    if not seller_email:
-        return settings
+def save_settings(seller_email: str, values: dict) -> dict[str, float]:
+    settings = _load_settings(seller_email)
+    updated = dict(settings)
     with get_db() as conn:
-        for key, value in settings.items():
-            conn.execute(
-                """
-                INSERT INTO profit_settings (seller_email, key, value, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(seller_email, key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
-                """,
-                (seller_email, key, value),
-            )
-    return settings
+        for key, default in DEFAULT_SETTINGS.items():
+            if key in values:
+                updated[key] = float(values[key])
+                conn.execute(
+                    """
+                    INSERT INTO profit_settings (seller_email, key, value)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(seller_email, key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (seller_email, key, float(values[key])),
+                )
+    return updated
 
 
-def weekly_profit_report(seller_email: str | None = None) -> dict:
-    df = load_orders_df(seller_email)
-    settings = get_profit_settings(seller_email)
-    if df.empty:
-        return {"settings": settings, "summary": _empty_summary(), "weeks": [], "sku_profit": []}
+def weekly_profit(seller_email: str | None = None) -> dict:
+    seller_email = seller_email or "demo@seller-copilot.local"
+    orders = _orders(seller_email)
+    settings = _load_settings(seller_email)
+    weeks: dict[str, dict] = defaultdict(lambda: {"sales": 0.0, "delivered_profit": 0.0, "return_loss": 0.0, "rto_loss": 0.0, "net_profit": 0.0})
 
-    work = df.copy()
-    work["order_date"] = pd.to_datetime(work["order_date"], errors="coerce")
-    work = work.dropna(subset=["order_date"])
-    if work.empty:
-        return {"settings": settings, "summary": _empty_summary(), "weeks": [], "sku_profit": []}
+    for row in orders:
+        try:
+            order_dt = datetime.fromisoformat(str(row["order_date"])).date()
+        except ValueError:
+            continue
+        week_start = (order_dt - timedelta(days=order_dt.weekday())).isoformat()
+        qty = max(1, int(row.get("quantity") or 1))
+        sales = float(row.get("discounted_price") or 0) * qty
+        cost = sales * (settings["product_cost_percent"] / 100.0)
+        fee = sales * (settings["marketplace_fee_percent"] / 100.0)
+        ads = sales * (settings["ad_cost_percent"] / 100.0)
+        forward = settings["forward_shipping_per_order"] * qty
+        status = _status_bucket(row.get("status"))
+        delivered_profit = sales - cost - fee - ads - forward
+        return_loss = settings["return_shipping_per_order"] * qty if status == "returned" else 0.0
+        rto_loss = settings["return_shipping_per_order"] * qty if status == "rto" else 0.0
+        net = delivered_profit - return_loss - rto_loss
+        bucket = weeks[week_start]
+        bucket["week_start"] = week_start
+        bucket["sales"] += sales
+        bucket["delivered_profit"] += max(0.0, delivered_profit) if status == "delivered" else 0.0
+        bucket["return_loss"] += return_loss
+        bucket["rto_loss"] += rto_loss
+        bucket["net_profit"] += net
 
-    work["week_start"] = work["order_date"].dt.to_period("W-MON").apply(lambda item: item.start_time.date().isoformat())
-    financials = _row_financials(work, settings)
-    merged = pd.concat([work.reset_index(drop=True), financials], axis=1)
+    week_rows = sorted(weeks.values(), key=lambda row: row["week_start"])
+    for row in week_rows:
+        row["status"] = "Profit" if row["net_profit"] >= 0 else "Loss"
 
-    weeks = []
-    for week, group in merged.groupby("week_start"):
-        row = _group_profit_row(group, "week_start", week)
-        weeks.append(row)
-    weeks = sorted(weeks, key=lambda item: item["week_start"])
+    latest = week_rows[-1] if week_rows else None
+    prev = week_rows[-2] if len(week_rows) >= 2 else None
+    change_value = None if not latest or not prev else round(latest["net_profit"] - prev["net_profit"], 2)
+    change_percent = None if change_value is None or prev["net_profit"] == 0 else round((change_value / abs(prev["net_profit"])) * 100, 1)
+    trend = "Flat"
+    if change_value is not None:
+        trend = "Up" if change_value > 0 else "Down" if change_value < 0 else "Flat"
 
-    week_trend = []
-    previous_net_profit = None
-    for row in weeks:
-        current_net_profit = float(row["net_profit"])
-        if previous_net_profit is None:
-            change_value = None
-            change_percent = None
-            trend = "New"
-        else:
-            change_value = round(current_net_profit - previous_net_profit, 2)
-            change_percent = _percent(change_value, abs(previous_net_profit)) if previous_net_profit else 0.0
-            if change_value > 0:
-                trend = "Up"
-            elif change_value < 0:
-                trend = "Down"
-            else:
-                trend = "Flat"
-        week_trend.append(
-            {
-                "week_start": row["week_start"],
-                "net_profit": current_net_profit,
-                "change_value": change_value,
-                "change_percent": change_percent,
-                "trend": trend,
-            }
-        )
-        previous_net_profit = current_net_profit
-    latest_week_change = week_trend[-1] if week_trend else None
+    sku_profit: dict[str, dict] = defaultdict(lambda: {"sales": 0.0, "return_loss": 0.0, "rto_loss": 0.0, "net_profit": 0.0, "returned_orders": 0, "rto_orders": 0})
+    for row in orders:
+        sku = (row.get("sku") or "UNKNOWN").strip() or "UNKNOWN"
+        qty = max(1, int(row.get("quantity") or 1))
+        sales = float(row.get("discounted_price") or 0) * qty
+        cost = sales * (settings["product_cost_percent"] / 100.0)
+        fee = sales * (settings["marketplace_fee_percent"] / 100.0)
+        ads = sales * (settings["ad_cost_percent"] / 100.0)
+        forward = settings["forward_shipping_per_order"] * qty
+        delivered_profit = sales - cost - fee - ads - forward
+        status = _status_bucket(row.get("status"))
+        return_loss = settings["return_shipping_per_order"] * qty if status == "returned" else 0.0
+        rto_loss = settings["return_shipping_per_order"] * qty if status == "rto" else 0.0
+        bucket = sku_profit[sku]
+        bucket["sku"] = sku
+        bucket["product_name"] = row.get("product_name") or sku
+        bucket["sales"] += sales
+        bucket["return_loss"] += return_loss
+        bucket["rto_loss"] += rto_loss
+        bucket["net_profit"] += delivered_profit - return_loss - rto_loss
+        bucket["returned_orders"] += qty if status == "returned" else 0
+        bucket["rto_orders"] += qty if status == "rto" else 0
 
-    sku_profit = []
-    for sku, group in merged.groupby("sku"):
-        row = _group_profit_row(group, "sku", sku)
-        row["product_name"] = str(group["product_name"].mode().iloc[0]) if not group["product_name"].mode().empty else sku
-        sku_profit.append(row)
-    sku_profit = sorted(sku_profit, key=lambda item: item["net_profit"], reverse=True)[:15]
-
-    summary = _group_profit_row(merged, "summary", "All Orders")
-    summary["status"] = "Profit" if summary["net_profit"] >= 0 else "Loss"
-    summary["profit_margin_percent"] = _percent(summary["net_profit"], summary["sales"])
-
+    sku_rows = sorted(sku_profit.values(), key=lambda row: row["net_profit"], reverse=True)
     return {
+        "summary": {
+            "sales": sum(row["sales"] for row in week_rows),
+            "return_loss": sum(row["return_loss"] for row in week_rows),
+            "rto_loss": sum(row["rto_loss"] for row in week_rows),
+            "net_profit": sum(row["net_profit"] for row in week_rows),
+            "profit_margin_percent": round((sum(row["net_profit"] for row in week_rows) / sum(row["sales"] for row in week_rows)) * 100, 1) if week_rows and sum(row["sales"] for row in week_rows) else 0.0,
+            "status": "Healthy" if sum(row["net_profit"] for row in week_rows) >= 0 else "Needs attention",
+        },
+        "weeks": week_rows,
+        "week_trend": week_rows,
+        "latest_week_change": {"change_value": change_value, "change_percent": change_percent, "week_start": latest["week_start"] if latest else None, "trend": trend},
+        "sku_profit": sku_rows,
         "settings": settings,
-        "summary": summary,
-        "weeks": sorted(weeks, key=lambda item: item["week_start"], reverse=True)[:12],
-        "week_trend": week_trend[-12:],
-        "latest_week_change": latest_week_change,
-        "sku_profit": sku_profit,
         "explanation": [
-            "Delivered orders count sales after estimated product cost, marketplace fee, shipping, and ad cost.",
-            "Customer returns count as lost expected profit plus return shipping, because the item comes back and the seller pays the return shipment.",
-            "RTO stays separate and is treated as a delivery failure without return-shipping deduction.",
-            "Use real cost values here for accurate profit/loss tracking.",
+            "Use weekly profit to track whether sales are actually profitable after returns, shipping, fees, and ads.",
+            "A positive net profit means the current mix is healthy enough to scale cautiously.",
         ],
-    }
-
-
-def _row_financials(df: pd.DataFrame, settings: dict) -> pd.DataFrame:
-    quantity = pd.to_numeric(df["quantity"], errors="coerce").fillna(1).clip(lower=1)
-    sale_value = pd.to_numeric(df["discounted_price"], errors="coerce").fillna(0) * quantity
-    product_cost = sale_value * (settings["product_cost_percent"] / 100)
-    marketplace_fee = sale_value * (settings["marketplace_fee_percent"] / 100)
-    forward_shipping = quantity * settings["forward_shipping_per_order"]
-    ad_cost = sale_value * (settings["ad_cost_percent"] / 100) * _paid_source_mask(df).astype(float)
-    expected_profit = sale_value - product_cost - marketplace_fee - forward_shipping - ad_cost
-    return_shipping = quantity * settings["return_shipping_per_order"]
-
-    delivered = status_mask(df, "delivered")
-    rto = status_mask(df, "rto")
-    customer_return = status_mask(df, "return")
-    cancelled = status_mask(df, "cancelled")
-
-    sales = sale_value.where(delivered, 0)
-    delivered_profit = expected_profit.where(delivered, 0)
-    return_loss = (expected_profit.clip(lower=0) + return_shipping).where(customer_return, 0)
-    rto_loss = expected_profit.clip(lower=0).where(rto, 0)
-    cancellation_loss = (forward_shipping * 0.25).where(cancelled, 0)
-    net_profit = delivered_profit - return_loss - rto_loss - cancellation_loss
-
-    return pd.DataFrame(
-        {
-            "sales": sales,
-            "delivered_profit": delivered_profit,
-            "return_loss": return_loss,
-            "rto_loss": rto_loss,
-            "cancellation_loss": cancellation_loss,
-            "net_profit": net_profit,
-            "delivered_qty": quantity.where(delivered, 0),
-            "returned_qty": quantity.where(customer_return, 0),
-            "rto_qty": quantity.where(rto, 0),
-            "cancelled_qty": quantity.where(cancelled, 0),
-        }
-    )
-
-
-def _group_profit_row(group: pd.DataFrame, key_name: str, key_value: str) -> dict:
-    row = {
-        key_name: key_value,
-        "sales": round(float(group["sales"].sum()), 2),
-        "delivered_profit": round(float(group["delivered_profit"].sum()), 2),
-        "return_loss": round(float(group["return_loss"].sum()), 2),
-        "rto_loss": round(float(group["rto_loss"].sum()), 2),
-        "cancellation_loss": round(float(group["cancellation_loss"].sum()), 2),
-        "net_profit": round(float(group["net_profit"].sum()), 2),
-        "delivered_orders": int(group["delivered_qty"].sum()),
-        "returned_orders": int(group["returned_qty"].sum()),
-        "rto_orders": int(group["rto_qty"].sum()),
-        "cancelled_orders": int(group["cancelled_qty"].sum()),
-    }
-    row["profit_margin_percent"] = _percent(row["net_profit"], row["sales"])
-    row["status"] = "Profit" if row["net_profit"] >= 0 else "Loss"
-    return row
-
-
-def _paid_source_mask(df: pd.DataFrame) -> pd.Series:
-    return df["order_source"].fillna("").astype(str).str.lower().str.contains("ad|paid|sponsored", na=False)
-
-
-def _percent(value: float, total: float) -> float:
-    if not total:
-        return 0.0
-    return round((float(value) / float(total)) * 100, 1)
-
-
-def _empty_summary() -> dict:
-    return {
-        "summary": "All Orders",
-        "sales": 0,
-        "delivered_profit": 0,
-        "return_loss": 0,
-        "rto_loss": 0,
-        "cancellation_loss": 0,
-        "net_profit": 0,
-        "delivered_orders": 0,
-        "returned_orders": 0,
-        "rto_orders": 0,
-        "cancelled_orders": 0,
-        "profit_margin_percent": 0,
-        "status": "No Data",
     }

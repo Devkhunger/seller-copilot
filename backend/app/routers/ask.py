@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from app.auth import get_current_user
 from app.database import log_usage
-from app.schemas import AskRequest
-from app.services.ai_service import answer_seller_question
+from app.services.ai_service import generate_ai_summary
 
 router = APIRouter(prefix="/api", tags=["ask"])
 
 
+class AskPayload(BaseModel):
+    question: str
+
+
 @router.post("/ask")
-def ask_seller_copilot(payload: AskRequest, current_user: dict = Depends(get_current_user)):
-    seller_email = current_user["email"]
-    result = answer_seller_question(payload.question)
-    log_usage("seller_question", payload.question[:200], seller_email)
-    return result
+def ask_copilot(payload: AskPayload, current_user: dict = Depends(get_current_user)):
+    log_usage("copilot_asked", payload.question, current_user["email"])
+    return generate_ai_summary(payload.question, current_user["email"])

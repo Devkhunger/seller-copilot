@@ -1,1 +1,1 @@
-
+"""Seller Copilot service package."""
