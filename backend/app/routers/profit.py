@@ -1,27 +1,33 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from app.auth import get_current_user
 from app.database import log_usage
-from app.schemas import ProfitSettingsUpdate
-from app.services.profit import get_profit_settings, save_profit_settings, weekly_profit_report
+from app.services.profit import save_settings, weekly_profit
 
 router = APIRouter(prefix="/api", tags=["profit"])
 
 
+class ProfitSettingsPayload(BaseModel):
+    product_cost_percent: float | None = None
+    marketplace_fee_percent: float | None = None
+    forward_shipping_per_order: float | None = None
+    return_shipping_per_order: float | None = None
+    ad_cost_percent: float | None = None
+
+
 @router.get("/weekly-profit")
 def get_weekly_profit(current_user: dict = Depends(get_current_user)):
-    seller_email = current_user["email"]
-    log_usage("weekly_profit_viewed", "Weekly profit opened", seller_email)
-    return weekly_profit_report(seller_email)
+    log_usage("weekly_profit_viewed", "Weekly profit opened", current_user["email"])
+    return weekly_profit(current_user["email"])
 
 
-@router.get("/profit-settings")
-def get_settings(current_user: dict = Depends(get_current_user)):
-    return get_profit_settings(current_user["email"])
-
-
+@router.post("/weekly-profit/settings")
 @router.post("/profit-settings")
-def post_settings(payload: ProfitSettingsUpdate, current_user: dict = Depends(get_current_user)):
-    seller_email = current_user["email"]
-    log_usage("profit_settings_updated", "Profit settings updated", seller_email)
-    return save_profit_settings(payload.model_dump(exclude_none=True), seller_email)
+def update_weekly_profit_settings(payload: ProfitSettingsPayload, current_user: dict = Depends(get_current_user)):
+    settings = {k: v for k, v in payload.model_dump().items() if v is not None}
+    updated = save_settings(current_user["email"], settings)
+    log_usage("profit_settings_saved", "Weekly profit settings updated", current_user["email"])
+    return {"settings": updated}

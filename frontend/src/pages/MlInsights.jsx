@@ -39,6 +39,16 @@ export default function MlInsights() {
         </div>
       </section>
 
+      <section className="card mt-5">
+        <h2 className="text-xl font-black">Model Notes</h2>
+        <ul className="mt-3 space-y-2 text-sm text-slate-600">
+          {(data.model_notes || []).map((note) => (
+            <li key={note} className="rounded-lg bg-slate-50 p-3">{note}</li>
+          ))}
+          {!data.model_notes?.length && <li className="rounded-lg bg-slate-50 p-3">No model notes yet.</li>}
+        </ul>
+      </section>
+
       <section className="mt-5 grid gap-5 xl:grid-cols-2">
         <DataTable
           title="Next 14 Days Sales Plan"

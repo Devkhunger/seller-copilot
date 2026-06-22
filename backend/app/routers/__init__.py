@@ -1,1 +1,1 @@
-
+"""Seller Copilot router package."""

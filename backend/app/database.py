@@ -29,6 +29,8 @@ def init_db():
                 full_name TEXT DEFAULT '',
                 password_salt TEXT NOT NULL,
                 password_hash TEXT NOT NULL,
+                auth_provider TEXT NOT NULL DEFAULT 'password',
+                google_sub TEXT,
                 google_sheet_url TEXT DEFAULT '',
                 google_sheet_tab TEXT DEFAULT '',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -43,6 +45,7 @@ def init_db():
             );
             """
         )
+        _ensure_user_schema(conn)
         _ensure_order_rows_schema(conn)
         _ensure_actions_schema(conn)
         _ensure_usage_logs_schema(conn)
@@ -57,6 +60,36 @@ def log_usage(event_type: str, detail: str = "", seller_email: str | None = None
             "INSERT INTO usage_logs (seller_email, event_type, detail) VALUES (?, ?, ?)",
             (seller_email, event_type, detail),
         )
+
+
+def _ensure_user_schema(conn: sqlite3.Connection):
+    if not _table_exists(conn, "users"):
+        conn.execute(
+            f"""
+            CREATE TABLE users (
+                email TEXT PRIMARY KEY,
+                full_name TEXT DEFAULT '',
+                password_salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                auth_provider TEXT NOT NULL DEFAULT 'password',
+                google_sub TEXT,
+                google_sheet_url TEXT DEFAULT '',
+                google_sheet_tab TEXT DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+    else:
+        columns = _table_columns(conn, "users")
+        if "auth_provider" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'password'")
+        if "google_sub" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+        if "google_sheet_url" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN google_sheet_url TEXT DEFAULT ''")
+        if "google_sheet_tab" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN google_sheet_tab TEXT DEFAULT ''")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL AND google_sub != ''")
 
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:

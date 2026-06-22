@@ -58,8 +58,8 @@ def create_user(email: str, password: str, full_name: str = "") -> dict:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists.")
         conn.execute(
             """
-            INSERT INTO users (email, full_name, password_salt, password_hash)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO users (email, full_name, password_salt, password_hash, auth_provider)
+            VALUES (?, ?, ?, ?, 'password')
             """,
             (email, full_name.strip(), salt_hex, hash_hex),
         )
@@ -69,7 +69,7 @@ def create_user(email: str, password: str, full_name: str = "") -> dict:
 def get_user_by_email(email: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
-            "SELECT email, full_name, google_sheet_url, google_sheet_tab, created_at FROM users WHERE email = ?",
+            "SELECT email, full_name, auth_provider, google_sub, google_sheet_url, google_sheet_tab, created_at FROM users WHERE email = ?",
             (normalize_email(email),),
         ).fetchone()
     return dict(row) if row else None
@@ -80,7 +80,7 @@ def authenticate_user(email: str, password: str) -> dict:
     validate_email(email)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT email, full_name, password_salt, password_hash, google_sheet_url, google_sheet_tab, created_at FROM users WHERE email = ?",
+            "SELECT email, full_name, auth_provider, password_salt, password_hash, google_sub, google_sheet_url, google_sheet_tab, created_at FROM users WHERE email = ?",
             (email,),
         ).fetchone()
     if not row or not verify_password(password, row["password_salt"], row["password_hash"]):
@@ -142,7 +142,7 @@ def get_user_from_token(token: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
             """
-            SELECT u.email, u.full_name, u.google_sheet_url, u.google_sheet_tab, s.expires_at, s.revoked_at
+            SELECT u.email, u.full_name, u.auth_provider, u.google_sub, u.google_sheet_url, u.google_sheet_tab, s.expires_at, s.revoked_at
             FROM sessions s
             JOIN users u ON u.email = s.email
             WHERE s.token_hash = ?
@@ -160,6 +160,8 @@ def get_user_from_token(token: str) -> dict | None:
     return {
         "email": row["email"],
         "full_name": row["full_name"] or row["email"],
+        "auth_provider": row["auth_provider"] or "password",
+        "google_sub": row["google_sub"] or "",
         "google_sheet_url": row["google_sheet_url"] or "",
         "google_sheet_tab": row["google_sheet_tab"] or "",
         "session_token": token,
