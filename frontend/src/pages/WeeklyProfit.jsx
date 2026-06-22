@@ -38,7 +38,7 @@ export default function WeeklyProfit() {
   if (error) return <p className="card text-red-700">{error}</p>;
   if (!data) return <p className="card">Preparing weekly profit...</p>;
 
-  const summary = data.summary;
+  const summary = data?.summary || {};
   const trendData = data.week_trend || [];
   const latestChange = data.latest_week_change;
   const latestTrend = trendData[trendData.length - 1] || null;
@@ -209,7 +209,7 @@ export default function WeeklyProfit() {
           </div>
           <button className="btn mt-4" disabled={saving}>{saving ? "Saving..." : "Save Costs"}</button>
           <div className="mt-4 grid gap-2 text-sm text-slate-600">
-            {(data.explanation || []).map((item) => <p key={item} className="rounded-lg bg-slate-50 p-3">{item}</p>)}
+            {(data?.explanation || []).map((item) => <p key={item} className="rounded-lg bg-slate-50 p-3">{item}</p>)}
           </div>
         </form>
 
@@ -220,7 +220,7 @@ export default function WeeklyProfit() {
               <tr><th className="py-2">Week</th><th>Sales</th><th>Profit</th><th>Return Loss</th><th>RTO Loss</th><th>Net</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {(data.weeks || []).map((week) => (
+              {(data?.weeks || []).map((week) => (
                 <tr key={week.week_start} className="border-t border-slate-200">
                   <td className="py-3 font-semibold">{week.week_start}</td>
                   <td>{money(week.sales)}</td>
@@ -233,7 +233,7 @@ export default function WeeklyProfit() {
               ))}
             </tbody>
           </table>
-          {!data.weeks?.length && <p className="py-6 text-sm text-slate-500">Upload dated orders to see weekly profit.</p>}
+          {!(data?.weeks || []).length && <p className="py-6 text-sm text-slate-500">Upload dated orders to see weekly profit.</p>}
         </section>
       </section>
 
@@ -244,7 +244,7 @@ export default function WeeklyProfit() {
             <tr><th className="py-2">SKU</th><th>Sales</th><th>Return Loss</th><th>RTO Loss</th><th>Net</th><th>Returned</th><th>RTO</th><th>Status</th></tr>
           </thead>
           <tbody>
-            {(data.sku_profit || []).map((item) => (
+            {(data?.sku_profit || []).map((item) => (
               <tr key={item.sku} className="border-t border-slate-200">
                 <td className="py-3 font-semibold">{item.sku}<span className="block text-xs font-normal text-slate-500">{item.product_name}</span></td>
                 <td>{money(item.sales)}</td>
