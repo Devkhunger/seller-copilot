@@ -1,9 +1,6 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, clearSession } from "../api/client.js";
-
-export default function Login() {
 
 function formatLoginError(error) {
   const message = error?.message;
@@ -28,6 +25,8 @@ function formatLoginError(error) {
   }
   return "Login failed";
 }
+
+export default function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({
@@ -38,12 +37,6 @@ function formatLoginError(error) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem("sellerToken");
-
-  useEffect(() => {
-    if (token) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [navigate, token]);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));

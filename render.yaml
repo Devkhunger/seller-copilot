@@ -14,6 +14,12 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-5.2
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
     disk:
       name: seller-copilot-data
       mountPath: /var/data
@@ -28,6 +34,8 @@ services:
     envVars:
       - key: VITE_API_BASE
         value: https://seller-copilot-m1g3.onrender.com
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
     routes:
       - type: rewrite
         source: /*

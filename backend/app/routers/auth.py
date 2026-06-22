@@ -1,30 +1,41 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 
 from app.auth import authenticate_user, build_auth_response, create_user, get_current_user, revoke_session
-from app.schemas import AuthRequest
+
+router = APIRouter(prefix="/api", tags=["auth"])
 
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+class AuthPayload(BaseModel):
+    email: str
+    password: str
+    full_name: str | None = ""
 
 
 @router.post("/register")
-def register(payload: AuthRequest):
-    user = create_user(payload.email, payload.password, payload.full_name)
+@router.post("/auth/register")
+def register(payload: AuthPayload):
+    user = create_user(payload.email, payload.password, payload.full_name or "")
     return build_auth_response(user)
 
 
 @router.post("/login")
-def login(payload: AuthRequest):
+@router.post("/auth/login")
+def login(payload: AuthPayload):
     user = authenticate_user(payload.email, payload.password)
     return build_auth_response(user)
 
 
 @router.get("/me")
-def me(current_user=Depends(get_current_user)):
-    return {k: v for k, v in current_user.items() if k != "session_token"}
+@router.get("/auth/me")
+def me(current_user: dict = Depends(get_current_user)):
+    return current_user
 
 
 @router.post("/logout")
-def logout(current_user=Depends(get_current_user)):
+@router.post("/auth/logout")
+def logout(current_user: dict = Depends(get_current_user)):
     revoke_session(current_user["session_token"])
     return {"ok": True}
