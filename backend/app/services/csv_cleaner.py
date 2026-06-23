@@ -22,7 +22,7 @@ ALIASES = {
     "sku": ["sku", "product sku", "item sku", "merchant sku"],
     "product_name": ["product name", "product", "item name", "title"],
     "customer_state": ["customer state", "state", "shipping state", "delivery state"],
-    "status": ["status", "order status", "fulfillment status"],
+    "status": ["status", "order status", "fulfillment status", "reason for credit entry", "credit entry reason"],
     "order_source": ["order source", "source", "marketplace", "platform"],
     "listed_price": ["listed price", "mrp", "price", "original price", "selling price"],
     "discounted_price": ["discounted price", "sale price", "final price", "discount price"],

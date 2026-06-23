@@ -40,7 +40,7 @@ def _status_bucket(status: str) -> str:
     token = (status or "").strip().upper()
     if token in {"DELIVERED", "SUCCESS", "COMPLETED"}:
         return "delivered"
-    if token in {"RTO", "RETURN TO ORIGIN", "RETURNED", "RETURN"}:
+    if token in {"RTO", "RETURN TO ORIGIN", "RETURNED", "RETURN"} or token.startswith("RTO") or "RETURN" in token:
         return "rto"
     if token in {"CANCELLED", "CANCELED", "CANCEL"}:
         return "cancelled"
