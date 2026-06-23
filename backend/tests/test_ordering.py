@@ -21,6 +21,28 @@ class OrderingTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         self.assertEqual(cleaned["order_date"].tolist(), ["2024-01-01", "2024-01-02", "2024-01-03"])
 
+    def test_clean_csv_upload_maps_reason_for_credit_entry_to_status(self):
+        csv_bytes = b"""Reason for Credit Entry,sku,product name,customer state,order source,listed price,discounted price,quantity
+DELIVERED,SKU-1,Item 1,KA,natural,100,90,1
+CANCELLED,SKU-2,Item 2,KA,natural,100,90,1
+"""
+
+        cleaned, warnings = clean_csv_upload(csv_bytes)
+
+        self.assertEqual(warnings, [])
+        self.assertEqual(cleaned["status"].tolist(), ["DELIVERED", "CANCELLED"])
+
+    def test_clean_csv_upload_maps_rto_variants_to_status(self):
+        csv_bytes = b"""Reason for Credit Entry,sku,product name,customer state,order source,listed price,discounted price,quantity
+RTO_COMPLETE,SKU-1,Item 1,KA,natural,100,90,1
+RTO_DELIVERY_FAILED,SKU-2,Item 2,KA,natural,100,90,1
+"""
+
+        cleaned, warnings = clean_csv_upload(csv_bytes)
+
+        self.assertEqual(warnings, [])
+        self.assertEqual(cleaned["status"].tolist(), ["RTO_COMPLETE", "RTO_DELIVERY_FAILED"])
+
     def test_rto_training_rows_use_only_prior_rows_for_history(self):
         df = pd.DataFrame(
             [
