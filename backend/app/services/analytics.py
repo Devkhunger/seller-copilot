@@ -54,6 +54,39 @@ def _money(value) -> float:
         return 0.0
 
 
+def _build_risk_rows(orders: list[dict], group_fields: tuple[str, ...], display_fields: tuple[str, ...]) -> list[dict]:
+    grouped: dict[tuple[str, ...], list[dict]] = defaultdict(list)
+    for row in orders:
+        key = tuple(_risk_group_value(row.get(field), field) for field in group_fields)
+        grouped[key].append(row)
+
+    rows: list[dict] = []
+    for key, items in grouped.items():
+        quantities = [max(1, int(row.get("quantity") or 1)) for row in items]
+        total = sum(quantities)
+        rto = sum(q for row, q in zip(items, quantities) if _status_bucket(row.get("status")) == "rto")
+        cancelled = sum(q for row, q in zip(items, quantities) if _status_bucket(row.get("status")) == "cancelled")
+        risk = round(min(100.0, max(0.0, (rto / total) * 100.0 + (cancelled / total) * 25.0)), 1) if total else 0.0
+        label = "High Risk" if risk >= 35 else "Low Risk" if risk <= 15 else "Medium Risk"
+        row = {
+            "orders": total,
+            "rto_rate": risk,
+            "risk_label": label,
+            "confidence": "High" if total >= 10 else "Medium" if total >= 3 else "Low",
+        }
+        for index, field in enumerate(display_fields):
+            row[field] = key[index]
+        rows.append(row)
+
+    rows.sort(key=lambda item: (item["rto_rate"], item["orders"]), reverse=True)
+    return rows
+
+
+def _risk_group_value(value, field: str) -> str:
+    default = "UNKNOWN" if field == "sku" else "Unknown"
+    return (str(value).strip() if value is not None else default) or default
+
+
 def calculate_sku_scores(seller_email: str | None = None) -> list[dict]:
     orders = _fetch_orders(seller_email)
     if not orders:
@@ -176,37 +209,24 @@ def dashboard_metrics(seller_email: str | None = None) -> dict:
 
 def rto_risk_analysis(seller_email: str | None = None) -> dict:
     orders = _fetch_orders(seller_email)
-    rows: list[dict] = []
-    grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
-    for row in orders:
-        grouped[((row.get("sku") or "UNKNOWN").strip() or "UNKNOWN", (row.get("customer_state") or "Unknown").strip() or "Unknown")].append(row)
-
-    for (sku, state), items in grouped.items():
-        quantities = [max(1, int(row.get("quantity") or 1)) for row in items]
-        total = sum(quantities)
-        rto = sum(q for row, q in zip(items, quantities) if _status_bucket(row.get("status")) == "rto")
-        cancelled = sum(q for row, q in zip(items, quantities) if _status_bucket(row.get("status")) == "cancelled")
-        risk = round(min(100.0, max(0.0, (rto / total) * 100.0 + (cancelled / total) * 25.0)), 1) if total else 0.0
-        label = "High Risk" if risk >= 35 else "Low Risk" if risk <= 15 else "Medium Risk"
-        rows.append(
-            {
-                "sku": sku,
-                "customer_state": state,
-                "orders": total,
-                "rto_rate": risk,
-                "risk_label": label,
-                "confidence": "High" if total >= 10 else "Medium" if total >= 3 else "Low",
-            }
-        )
-
-    rows.sort(key=lambda item: (item["rto_rate"], item["orders"]), reverse=True)
-    high_risk = [row for row in rows if row["risk_label"] == "High Risk"]
+    combo_rows = _build_risk_rows(orders, ("sku", "customer_state"), ("sku", "customer_state"))
+    state_rows = _build_risk_rows(orders, ("customer_state",), ("customer_state",))
+    sku_rows = _build_risk_rows(orders, ("sku",), ("sku",))
+    high_risk_combos = [row for row in combo_rows if row["risk_label"] == "High Risk"]
+    high_risk_states = [row for row in state_rows if row["risk_label"] == "High Risk"]
+    high_risk_skus = [row for row in sku_rows if row["risk_label"] == "High Risk"]
     return {
-        "items": rows,
-        "high_risk_combos": high_risk,
+        "items": combo_rows,
+        "high_risk_states": high_risk_states,
+        "high_risk_skus": high_risk_skus,
+        "high_risk_combos": high_risk_combos,
         "summary": {
-            "high_risk_count": len(high_risk),
-            "total_combos": len(rows),
+            "high_risk_count": len(high_risk_combos),
+            "total_combos": len(combo_rows),
+            "high_risk_state_count": len(high_risk_states),
+            "total_states": len(state_rows),
+            "high_risk_sku_count": len(high_risk_skus),
+            "total_skus": len(sku_rows),
         },
     }
 

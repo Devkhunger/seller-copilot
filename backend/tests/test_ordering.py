@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
+from app.services.analytics import rto_risk_analysis
 from app.services.csv_cleaner import clean_csv_upload
 from app.services.ml_models import _rto_training_rows
 
@@ -42,6 +44,23 @@ RTO_DELIVERY_FAILED,SKU-2,Item 2,KA,natural,100,90,1
 
         self.assertEqual(warnings, [])
         self.assertEqual(cleaned["status"].tolist(), ["RTO_COMPLETE", "RTO_DELIVERY_FAILED"])
+
+    def test_rto_risk_analysis_returns_state_and_sku_arrays(self):
+        orders = [
+            {"order_date": "2024-01-01", "sku": "SKU-1", "customer_state": "KA", "status": "RTO_COMPLETE", "order_source": "natural", "listed_price": 100, "discounted_price": 90, "quantity": 2},
+            {"order_date": "2024-01-02", "sku": "SKU-1", "customer_state": "KA", "status": "DELIVERED", "order_source": "natural", "listed_price": 100, "discounted_price": 90, "quantity": 1},
+            {"order_date": "2024-01-03", "sku": "SKU-2", "customer_state": "MH", "status": "CANCELLED", "order_source": "natural", "listed_price": 100, "discounted_price": 90, "quantity": 1},
+        ]
+
+        with patch("app.services.analytics._fetch_orders", return_value=orders):
+            risk = rto_risk_analysis("seller@example.com")
+
+        self.assertIn("high_risk_states", risk)
+        self.assertIn("high_risk_skus", risk)
+        self.assertEqual(risk["high_risk_states"][0]["customer_state"], "KA")
+        self.assertEqual(risk["high_risk_skus"][0]["sku"], "SKU-1")
+        self.assertGreaterEqual(risk["summary"]["total_states"], 2)
+        self.assertGreaterEqual(risk["summary"]["total_skus"], 2)
 
     def test_rto_training_rows_use_only_prior_rows_for_history(self):
         df = pd.DataFrame(
