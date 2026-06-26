@@ -30,9 +30,15 @@ export default function WeeklyProfit() {
   async function saveSettings(event) {
     event.preventDefault();
     setSaving(true);
-    await api.saveProfitSettings(settings);
-    await load();
-    setSaving(false);
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(settings).filter(([, value]) => value !== undefined && value !== "")
+      );
+      await api.saveProfitSettings(payload);
+      await load();
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (error) return <p className="card text-red-700">{error}</p>;
@@ -201,8 +207,11 @@ export default function WeeklyProfit() {
                   type="number"
                   min="0"
                   step="0.1"
-                  value={settings[key] ?? 0}
-                  onChange={(event) => setSettings({ ...settings, [key]: Number(event.target.value) })}
+                  value={settings[key] ?? ""}
+                  onChange={(event) => setSettings({
+                    ...settings,
+                    [key]: event.target.value === "" ? "" : Number(event.target.value),
+                  })}
                 />
               </label>
             ))}

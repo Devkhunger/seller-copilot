@@ -83,7 +83,16 @@ def authenticate_user(email: str, password: str) -> dict:
             "SELECT email, full_name, auth_provider, password_salt, password_hash, google_sub, google_sheet_url, google_sheet_tab, created_at FROM users WHERE email = ?",
             (email,),
         ).fetchone()
-    if not row or not verify_password(password, row["password_salt"], row["password_hash"]):
+    if not row:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+    if not row["password_salt"] or not row["password_hash"]:
+        if (row["auth_provider"] or "password") != "password":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This account was created with a different sign-in method. Use that sign-in or add a password to this account.",
+            )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+    if not verify_password(password, row["password_salt"], row["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
     return dict(row)
 
