@@ -33,13 +33,42 @@ def _status_bucket(status: str) -> str:
     token = (status or "").strip().upper()
     if token in {"DELIVERED", "SUCCESS", "COMPLETED"}:
         return "delivered"
-    if token in {"RTO", "RETURN TO ORIGIN"}:
+    if token in {"RTO", "RETURN TO ORIGIN", "RTO_COMPLETE", "RTO_LOCKED"} or token.startswith("RTO"):
         return "rto"
-    if token in {"RETURNED", "RETURN"}:
+    if token in {"RETURNED", "RETURN", "DOOR_STEP_EXCHANGED", "EXCHANGED"} or "RETURN" in token:
         return "returned"
     if token in {"CANCELLED", "CANCELED", "CANCEL"}:
         return "cancelled"
+    if token in {"SHIPPED", "READY_TO_SHIP", "PENDING", "HOLD", "PROCESSING"}:
+        return "open"
     return "other"
+
+
+def _row_financials(row: dict, settings: dict[str, float]) -> dict[str, float]:
+    qty = max(1, int(row.get("quantity") or 1))
+    status = _status_bucket(row.get("status"))
+    sale_value = float(row.get("discounted_price") or 0) * qty
+    requires_fulfillment_costs = status in {"delivered", "returned", "rto", "other"}
+
+    revenue = sale_value if status == "delivered" else 0.0
+    product_cost = sale_value * (settings["product_cost_percent"] / 100.0) if requires_fulfillment_costs else 0.0
+    marketplace_fee = sale_value * (settings["marketplace_fee_percent"] / 100.0) if requires_fulfillment_costs else 0.0
+    ad_cost = sale_value * (settings["ad_cost_percent"] / 100.0) if requires_fulfillment_costs else 0.0
+    forward_shipping = settings["forward_shipping_per_order"] * qty if requires_fulfillment_costs else 0.0
+    return_shipping = settings["return_shipping_per_order"] * qty if status in {"returned", "rto"} else 0.0
+
+    delivered_profit = revenue - product_cost - marketplace_fee - ad_cost - forward_shipping
+    net_profit = delivered_profit - return_shipping
+
+    return {
+        "qty": qty,
+        "status": status,
+        "sale_value": sale_value,
+        "revenue": revenue,
+        "delivered_profit": delivered_profit,
+        "return_shipping": return_shipping,
+        "net_profit": net_profit,
+    }
 
 
 def _load_settings(seller_email: str | None = None) -> dict[str, float]:
@@ -84,24 +113,15 @@ def weekly_profit(seller_email: str | None = None) -> dict:
         except ValueError:
             continue
         week_start = (order_dt - timedelta(days=order_dt.weekday())).isoformat()
-        qty = max(1, int(row.get("quantity") or 1))
-        sales = float(row.get("discounted_price") or 0) * qty
-        cost = sales * (settings["product_cost_percent"] / 100.0)
-        fee = sales * (settings["marketplace_fee_percent"] / 100.0)
-        ads = sales * (settings["ad_cost_percent"] / 100.0)
-        forward = settings["forward_shipping_per_order"] * qty
-        status = _status_bucket(row.get("status"))
-        delivered_profit = sales - cost - fee - ads - forward
-        return_loss = settings["return_shipping_per_order"] * qty if status == "returned" else 0.0
-        rto_loss = settings["return_shipping_per_order"] * qty if status == "rto" else 0.0
-        net = delivered_profit - return_loss - rto_loss
+        financials = _row_financials(row, settings)
+        status = financials["status"]
         bucket = weeks[week_start]
         bucket["week_start"] = week_start
-        bucket["sales"] += sales
-        bucket["delivered_profit"] += max(0.0, delivered_profit) if status == "delivered" else 0.0
-        bucket["return_loss"] += return_loss
-        bucket["rto_loss"] += rto_loss
-        bucket["net_profit"] += net
+        bucket["sales"] += financials["revenue"]
+        bucket["delivered_profit"] += financials["delivered_profit"] if status == "delivered" else 0.0
+        bucket["return_loss"] += financials["return_shipping"] if status == "returned" else 0.0
+        bucket["rto_loss"] += financials["return_shipping"] if status == "rto" else 0.0
+        bucket["net_profit"] += financials["net_profit"]
 
     week_rows = sorted(weeks.values(), key=lambda row: row["week_start"])
     for row in week_rows:
@@ -118,23 +138,16 @@ def weekly_profit(seller_email: str | None = None) -> dict:
     sku_profit: dict[str, dict] = defaultdict(lambda: {"sales": 0.0, "return_loss": 0.0, "rto_loss": 0.0, "net_profit": 0.0, "returned_orders": 0, "rto_orders": 0})
     for row in orders:
         sku = (row.get("sku") or "UNKNOWN").strip() or "UNKNOWN"
-        qty = max(1, int(row.get("quantity") or 1))
-        sales = float(row.get("discounted_price") or 0) * qty
-        cost = sales * (settings["product_cost_percent"] / 100.0)
-        fee = sales * (settings["marketplace_fee_percent"] / 100.0)
-        ads = sales * (settings["ad_cost_percent"] / 100.0)
-        forward = settings["forward_shipping_per_order"] * qty
-        delivered_profit = sales - cost - fee - ads - forward
-        status = _status_bucket(row.get("status"))
-        return_loss = settings["return_shipping_per_order"] * qty if status == "returned" else 0.0
-        rto_loss = settings["return_shipping_per_order"] * qty if status == "rto" else 0.0
+        financials = _row_financials(row, settings)
+        qty = financials["qty"]
+        status = financials["status"]
         bucket = sku_profit[sku]
         bucket["sku"] = sku
         bucket["product_name"] = row.get("product_name") or sku
-        bucket["sales"] += sales
-        bucket["return_loss"] += return_loss
-        bucket["rto_loss"] += rto_loss
-        bucket["net_profit"] += delivered_profit - return_loss - rto_loss
+        bucket["sales"] += financials["revenue"]
+        bucket["return_loss"] += financials["return_shipping"] if status == "returned" else 0.0
+        bucket["rto_loss"] += financials["return_shipping"] if status == "rto" else 0.0
+        bucket["net_profit"] += financials["net_profit"]
         bucket["returned_orders"] += qty if status == "returned" else 0
         bucket["rto_orders"] += qty if status == "rto" else 0
 

@@ -34,6 +34,7 @@ def ml_business_insights(seller_email: str | None = None) -> dict:
                 "rto_probability": item["rto_rate"],
                 "risk_label": item["risk_label"],
                 "confidence": item["confidence"],
+                "orders": item["orders"],
             }
             for item in rto["items"][:8]
         ],
@@ -45,6 +46,7 @@ def ml_business_insights(seller_email: str | None = None) -> dict:
                 "rto_probability": item["rto_rate"] if "rto_rate" in item else 0.0,
                 "opportunity_score": item["score"] if "score" in item else 50.0,
                 "decision": "Scale Ads and Stock" if item.get("score", 0) >= 75 else "Test Carefully" if item.get("score", 0) >= 45 else "Fix RTO Before Scaling",
+                "confidence": item.get("confidence", "Low"),
             }
             for item in sku_scores[:5]
         ],
