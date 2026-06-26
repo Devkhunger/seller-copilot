@@ -84,16 +84,19 @@ export default function MlInsights() {
             <tr><th className="py-2">SKU</th><th>Expected Orders</th><th>Sales Value</th><th>Return Risk</th><th>Priority</th><th>Action</th></tr>
           </thead>
           <tbody>
-            {(data.profit_opportunities || []).map((item) => (
-              <tr key={item.sku} className="border-t border-slate-200">
-                <td className="py-3 font-semibold">{item.sku}</td>
-                <td>{item.forecast_units}</td>
-                <td>₹{Math.round(item.revenue).toLocaleString("en-IN")}</td>
-                <td>{item.rto_probability}%</td>
-                <td>{item.opportunity_score}</td>
-                <td><Badge tone={item.decision.includes("Scale") ? "safe" : item.decision.includes("Fix") ? "risk" : "neutral"}>{sellerDecision(item.decision)}</Badge></td>
-              </tr>
-            ))}
+            {(data.profit_opportunities || []).map((item) => {
+              const decision = item.decision || "";
+              return (
+                <tr key={item.sku} className="border-t border-slate-200">
+                  <td className="py-3 font-semibold">{item.sku}</td>
+                  <td>{item.forecast_units}</td>
+                  <td>₹{Math.round(item.revenue).toLocaleString("en-IN")}</td>
+                  <td>{item.rto_probability}%</td>
+                  <td>{item.opportunity_score}</td>
+                  <td><Badge tone={decision.includes("Scale") ? "safe" : decision.includes("Fix") ? "risk" : "neutral"}>{sellerDecision(decision)}</Badge></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {!data.profit_opportunities?.length && <p className="py-6 text-sm text-slate-500">Upload delivered orders to prepare growth actions.</p>}
