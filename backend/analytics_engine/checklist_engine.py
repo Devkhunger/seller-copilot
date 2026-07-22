@@ -1,16 +1,27 @@
+PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
 def generate_daily_checklist(sku_metrics: list[dict]) -> list[dict]:
     actions = []
+    seen = set()
     for item in sku_metrics:
-        if item.get("rto_rate", 0) >= 0.30:
+        sku = item.get("sku", "UNKNOWN")
+        rto_rate = float(item.get("rto_rate", 0.0))
+        margin_pct = float(item.get("margin_pct", 0.0))
+        if rto_rate >= 0.30 and (sku, "rto") not in seen:
+            seen.add((sku, "rto"))
             actions.append({
-                "sku": item["sku"],
-                "priority": "high",
-                "action": f"Review COD eligibility for {item['sku']} (RTO {item['rto_rate']*100:.1f}%)",
+                "sku": sku,
+                "category": "rto",
+                "priority": "critical" if rto_rate >= 0.45 else "high",
+                "action": f"Review COD eligibility for {sku} (RTO {rto_rate * 100:.1f}%)",
             })
-        if item.get("margin_pct", 0) < 8.0:
+        if margin_pct < 8.0 and (sku, "margin") not in seen:
+            seen.add((sku, "margin"))
             actions.append({
-                "sku": item["sku"],
-                "priority": "medium",
-                "action": f"Reprice {item['sku']} to restore net margin above 8%",
+                "sku": sku,
+                "category": "margin",
+                "priority": "high" if margin_pct < 0 else "medium",
+                "action": f"Reprice {sku} to restore net margin above 8%",
             })
+    actions.sort(key=lambda a: (PRIORITY_ORDER.get(a["priority"], 9), a["sku"]))
     return actions
