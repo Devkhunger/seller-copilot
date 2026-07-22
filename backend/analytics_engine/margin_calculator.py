@@ -14,3 +14,7 @@ def compute_order_profit(
     net_profit = taxable_revenue - cogs - shipping_fee - platform_fee
     margin_pct = (net_profit / selling_price * 100.0) if selling_price > 0 else 0.0
     return {"net_profit": round(net_profit, 2), "margin_pct": round(margin_pct, 2)}
+
+def break_even_price(cogs: float, shipping_fee: float, platform_fee: float, gst_rate: float = 0.18) -> float:
+    base_cost = cogs + shipping_fee + platform_fee
+    return round(base_cost * (1.0 + max(0.0, gst_rate)), 2)
