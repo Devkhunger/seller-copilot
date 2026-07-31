@@ -24,8 +24,8 @@ ALIASES = {
     "customer_state": ["customer state", "state", "shipping state", "delivery state"],
     "status": ["status", "order status", "fulfillment status", "reason for credit entry", "credit entry reason"],
     "order_source": ["order source", "source", "marketplace", "platform"],
-    "listed_price": ["listed price", "mrp", "price", "original price", "selling price"],
-    "discounted_price": ["discounted price", "sale price", "final price", "discount price"],
+    "listed_price": ["listed price", "supplier listed price", "supplier listed price incl gst commission", "mrp", "price", "original price", "selling price"],
+    "discounted_price": ["discounted price", "supplier discounted price", "supplier discounted price incl gst commission", "supplier discounted price incl gst and commission", "supplier discounted price incl gst and commision", "sale price", "final price", "discount price"],
     "quantity": ["quantity", "qty", "units"],
 }
 
@@ -55,6 +55,10 @@ def clean_csv_upload(file_bytes: bytes) -> tuple[pd.DataFrame, list[str]]:
     cleaned["order_source"] = cleaned["order_source"].fillna("natural").astype(str).str.strip().replace("", "natural")
     cleaned["listed_price"] = _safe_money(cleaned["listed_price"])
     cleaned["discounted_price"] = _safe_money(cleaned["discounted_price"])
+    # Some marketplace reports provide only MRP/listed price. Use it as the
+    # sale value instead of silently turning revenue into zero.
+    if "discounted_price" not in column_map and "listed_price" in column_map:
+        cleaned["discounted_price"] = cleaned["listed_price"]
     cleaned["quantity"] = pd.to_numeric(cleaned["quantity"], errors="coerce").fillna(1).clip(lower=1).astype(int)
 
     cleaned = cleaned.sort_values(by=["order_date"], kind="mergesort", na_position="last").reset_index(drop=True)

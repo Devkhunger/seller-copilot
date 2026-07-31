@@ -209,7 +209,7 @@ def dashboard_metrics(seller_email: str | None = None) -> dict:
     total_orders = sum(max(1, int(row.get("quantity") or 1)) for row in orders)
     rto_orders = sum(max(1, int(row.get("quantity") or 1)) for row in orders if _status_bucket(row.get("status")) == "rto")
     cancelled_orders = sum(max(1, int(row.get("quantity") or 1)) for row in orders if _status_bucket(row.get("status")) == "cancelled")
-    total_revenue = sum(_money(row.get("discounted_price")) * max(1, int(row.get("quantity") or 1)) for row in orders)
+    total_revenue = sum((_money(row.get("discounted_price")) or _money(row.get("listed_price"))) * max(1, int(row.get("quantity") or 1)) for row in orders)
     top_sku = sku_scores[0] if sku_scores else None
     return {
         "summary": {

@@ -47,7 +47,8 @@ def _status_bucket(status: str) -> str:
 def _row_financials(row: dict, settings: dict[str, float]) -> dict[str, float]:
     qty = max(1, int(row.get("quantity") or 1))
     status = _status_bucket(row.get("status"))
-    sale_value = float(row.get("discounted_price") or 0) * qty
+    unit_price = row.get("discounted_price") or row.get("listed_price") or 0
+    sale_value = float(unit_price) * qty
     requires_fulfillment_costs = status in {"delivered", "returned", "rto", "other"}
 
     revenue = sale_value if status == "delivered" else 0.0
