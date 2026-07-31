@@ -42,6 +42,21 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="Dashboard">What should I do today to increase profitable orders and reduce losses?</PageHeader>
+      <section className="mb-5 overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/10 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-bold text-emerald-200">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" /> Live business view
+            </div>
+            <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Turn today’s orders into your next best move.</h2>
+            <p className="mt-2 max-w-xl leading-7 text-slate-300">Your workspace is ready with fresh signals on sales, profit, product health, and return risk.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/ask" className="btn bg-emerald-300 text-slate-950 hover:bg-emerald-200">Ask Copilot <span aria-hidden="true">→</span></Link>
+            <Link to="/upload" className="rounded-xl border border-white/20 px-4 py-2.5 font-semibold text-white transition hover:bg-white/10">Upload report</Link>
+          </div>
+        </div>
+      </section>
       <section className="mb-5 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-amber-50 p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -56,11 +71,11 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total Orders" value={metrics.total_orders} />
-        <StatCard label="Delivered" value={metrics.delivered_orders} />
-        <StatCard label="Cancelled" value={metrics.cancelled_orders} />
-        <StatCard label="RTO" value={metrics.rto_orders} />
-        <StatCard label="Revenue Estimate" value={money(metrics.revenue_estimate)} />
+        <StatCard label="Total Orders" value={metrics.total_orders} index={0} />
+        <StatCard label="Delivered" value={metrics.delivered_orders} index={1} />
+        <StatCard label="Cancelled" value={metrics.cancelled_orders} index={2} />
+        <StatCard label="RTO" value={metrics.rto_orders} index={3} />
+        <StatCard label="Revenue Estimate" value={money(metrics.revenue_estimate)} index={4} />
       </section>
 
       <section className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">

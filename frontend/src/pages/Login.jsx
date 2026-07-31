@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, clearSession } from "../api/client.js";
+import LanguageToggle from "../components/LanguageToggle.jsx";
 
 function formatLoginError(error) {
   const message = error?.message;
@@ -72,7 +73,9 @@ export default function Login() {
 
   return (
     <main className="grid min-h-screen place-items-center bg-slate-50 p-5">
-      <form onSubmit={submit} className="card w-full max-w-md">
+      <div className="w-full max-w-md">
+        <div className="mb-3 flex justify-end"><LanguageToggle /></div>
+        <form onSubmit={submit} className="card">
         <p className="text-xs font-black uppercase tracking-wide text-merchant">AI Seller Copilot</p>
         <h1 className="mt-2 text-3xl font-black">Daily decisions for ecommerce sellers</h1>
         <p className="mt-2 text-slate-600">Sign in with your email so your orders, inventory, and insights stay separate from every other seller.</p>
@@ -101,7 +104,8 @@ export default function Login() {
         </label>
         {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">{typeof error === "string" ? error : formatLoginError(error)}</p>}
         <button className="btn mt-5 w-full" disabled={loading}>{loading ? "Please wait..." : mode === "register" ? "Create account" : "Sign in"}</button>
-      </form>
+        </form>
+      </div>
     </main>
   );
 }
