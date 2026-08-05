@@ -10,3 +10,6 @@ def needs_reorder(stock_on_hand: int, avg_daily_units: float, lead_time_days: in
     if cover is None:
         return False
     return cover <= (lead_time_days + safety_days)
+
+def is_dead_stock(stock_on_hand: int, units_sold_30d: int, min_units_threshold: int = 2) -> bool:
+    return stock_on_hand > 0 and units_sold_30d <= min_units_threshold
