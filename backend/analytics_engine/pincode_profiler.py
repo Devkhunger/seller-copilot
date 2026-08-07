@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-def profile_pincodes(orders: list[dict]) -> dict[str, dict]:
+def profile_pincodes(orders: list[dict], min_orders: int = 5) -> dict[str, dict]:
     stats = defaultdict(lambda: {"total": 0, "rto": 0})
     for o in orders:
         pin = str(o.get("pincode") or "").strip()
@@ -12,4 +12,5 @@ def profile_pincodes(orders: list[dict]) -> dict[str, dict]:
     return {
         pin: {**s, "rto_rate": round(s["rto"] / s["total"], 4)}
         for pin, s in stats.items()
+        if s["total"] >= min_orders
     }
