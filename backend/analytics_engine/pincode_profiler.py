@@ -14,3 +14,7 @@ def profile_pincodes(orders: list[dict], min_orders: int = 5) -> dict[str, dict]
         for pin, s in stats.items()
         if s["total"] >= min_orders
     }
+
+def flagged_cod_pincodes(orders: list[dict], min_orders: int = 5, threshold: float = 0.35) -> list[str]:
+    profiles = profile_pincodes(orders, min_orders=min_orders)
+    return sorted(pin for pin, info in profiles.items() if info["rto_rate"] >= threshold)
