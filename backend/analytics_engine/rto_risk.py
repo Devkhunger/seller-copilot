@@ -3,7 +3,13 @@ def predict_rto_probability(
     order_value: float,
     pincode_rto_rate: float | None = None,
     prior_buyer_rtos: int = 0,
+    pincode: str | None = None,
+    pincode_profiles: dict[str, dict] | None = None,
 ) -> float:
+    if pincode_rto_rate is None and pincode and pincode_profiles:
+        profile = pincode_profiles.get(str(pincode).strip())
+        if profile is not None:
+            pincode_rto_rate = profile.get("rto_rate")
     base_rate = 0.12 if pincode_rto_rate is None else pincode_rto_rate
     score = max(0.0, min(1.0, base_rate))
     is_cod = str(payment_mode or "").lower() == "cod"
