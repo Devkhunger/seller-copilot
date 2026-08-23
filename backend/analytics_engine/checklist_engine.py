@@ -1,6 +1,8 @@
+from .inventory_alerts import needs_reorder
+
 PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
-def generate_daily_checklist(sku_metrics: list[dict]) -> list[dict]:
+def generate_daily_checklist(sku_metrics: list[dict], high_rto_pincodes: list[str] | None = None) -> list[dict]:
     actions = []
     seen = set()
     for item in sku_metrics:
@@ -28,5 +30,23 @@ def generate_daily_checklist(sku_metrics: list[dict]) -> list[dict]:
                 "estimated_impact_inr": est_gain,
                 "action": f"Reprice {sku} to restore net margin above 8%",
             })
+        if "stock_on_hand" in item and "avg_daily_units" in item:
+            if needs_reorder(item["stock_on_hand"], item["avg_daily_units"]) and (sku, "stock") not in seen:
+                seen.add((sku, "stock"))
+                actions.append({
+                    "sku": sku,
+                    "category": "inventory",
+                    "priority": "high",
+                    "estimated_impact_inr": round(monthly_rev * 0.2, 2),
+                    "action": f"Reorder {sku} immediately to prevent stockout",
+                })
+    for pin in (high_rto_pincodes or [])[:3]:
+        actions.append({
+            "sku": "ALL",
+            "category": "pincode",
+            "priority": "medium",
+            "estimated_impact_inr": 0.0,
+            "action": f"Disable COD or add verification for high-RTO pincode {pin}",
+        })
     actions.sort(key=lambda a: (PRIORITY_ORDER.get(a["priority"], 9), -a["estimated_impact_inr"]))
     return actions
