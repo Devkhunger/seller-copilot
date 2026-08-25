@@ -6,7 +6,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analytics_engine.checklist_engine import generate_daily_checklist
 from analytics_engine.csv_normalizer import normalize_order_row
+from analytics_engine.inventory_alerts import days_of_cover, is_dead_stock, needs_reorder
 from analytics_engine.margin_calculator import break_even_price, compute_order_profit
+from analytics_engine.pincode_profiler import flagged_cod_pincodes, profile_pincodes
 from analytics_engine.rto_risk import predict_rto_probability, risk_band
 from analytics_engine.sku_scoring import classify_sku_tier, compute_sku_score
 
@@ -41,6 +43,15 @@ class TestAnalyticsEngine(unittest.TestCase):
         ])
         self.assertEqual(items[0]["sku"], "SKU-A")
         self.assertEqual(items[0]["priority"], "critical")
+
+    def test_inventory_and_pincode_profiler(self):
+        self.assertIsNone(days_of_cover(25, 0))
+        self.assertTrue(needs_reorder(18, 2.0))
+        self.assertTrue(is_dead_stock(15, 1))
+        orders = [{"pincode": "835215", "status": "rto"}] * 3 + [{"pincode": "835215", "status": "delivered"}] * 3
+        profiles = profile_pincodes(orders, min_orders=5)
+        self.assertEqual(profiles["835215"]["rto_rate"], 0.5)
+        self.assertEqual(flagged_cod_pincodes(orders, min_orders=5), ["835215"])
 
 if __name__ == "__main__":
     unittest.main()
