@@ -1,32 +1,115 @@
-# AI Seller Copilot for Small Ecommerce Sellers
+# AI Seller Copilot for Small E-commerce Sellers
 
-AI Seller Copilot is a full-stack MVP that helps small ecommerce sellers upload Meesho, Flipkart, or Amazon order CSVs and answer:
+AI Seller Copilot is a full-stack business intelligence MVP designed to help small e-commerce sellers make data-driven decisions using their marketplace order data.
 
-**What should I do today to increase profitable orders and reduce losses?**
+The platform allows sellers to upload order CSV files from Meesho, Flipkart, and Amazon, automatically processes messy marketplace data, and generates actionable business insights.
+
+**What should I do today to increase profitable orders and reduce business losses?**
+
+## Live Demo
+
+**Live Application:** https://seller-copilot-4.onrender.com
+
+**GitHub Repository:** https://github.com/Devkhunger/seller-copilot
 
 ## Tech Stack
 
-- Frontend: React + Vite + Tailwind CSS
-- Backend: FastAPI
-- Data processing: pandas
-- Database: SQLite
-- Charts: Recharts
-- AI: modular `ai_service.py` with fallback rule-based summary and listing generation
+| Component | Technology |
+|---|---|
+| Frontend | React, Vite, Tailwind CSS |
+| Backend | Python, FastAPI |
+| Data Processing | Pandas |
+| Database | SQLite |
+| Data Visualization | Recharts |
+| AI Integration | Modular AI Service with Rule-Based Fallback |
 
-## Features
+## Core Features
 
-- CSV upload and automatic cleaning for messy marketplace columns
-- Dashboard summary with total, delivered, cancelled, RTO, revenue, top SKU, worst SKU, ad orders, and natural orders
-- SKU score table with Push, Watch, and Pause actions
-- RTO Risk Shield for states, SKUs, state + SKU combinations, and source-wise RTO
-- Promotion recommender for SKUs to promote, pause, improve, and safe state/product combinations
-- Daily AI business summary with rule-based fallback
-- Listing Doctor for SEO title, description, bullets, keywords, and platform-specific text
-- Daily action checklist stored in SQLite
-- Inventory alerts using average daily orders
-- Usage tracking for uploads, dashboard views, completed actions, listing generation, and stock updates
+### 1. CSV Upload & Data Processing
+- Upload order datasets from Meesho, Flipkart, and Amazon.
+- Automatically identify and clean inconsistent marketplace column names.
+- Handle missing values and normalize order statuses.
+- Prepare uploaded data for business analytics.
 
-## Setup
+### 2. Business Intelligence Dashboard
+- Total, delivered, cancelled and RTO orders.
+- Revenue overview.
+- Top-performing and underperforming SKUs.
+- Advertisement-driven and organic orders.
+
+### 3. SKU Performance Scoring
+Evaluates individual products using order volume, delivery rate, RTO rate and cancellation rate.
+
+- **Push:** Strong-performing products.
+- **Watch:** Products requiring monitoring.
+- **Pause:** Poor-performing products.
+
+### 4. RTO Risk Shield
+Identifies higher-RTO segments using:
+- State-wise analysis.
+- SKU-wise analysis.
+- State and SKU combinations.
+- Order-source-wise RTO patterns.
+
+### 5. Promotion Recommender
+Recommends products to promote, pause or improve and identifies safer state-product combinations.
+
+### 6. AI Business Summary
+Generates daily business summaries and actionable recommendations, with a rule-based fallback when an external LLM API is unavailable.
+
+### 7. Listing Doctor
+Generates:
+- SEO-friendly product titles.
+- Product descriptions.
+- Selling-point bullets.
+- Search keywords.
+- Platform-specific listing content.
+
+### 8. Inventory Management
+Uses average daily order volume to estimate stock requirements and generate inventory alerts.
+
+### 9. Daily Action Checklist
+Stores business recommendations and daily tasks in SQLite and tracks completed actions.
+
+### 10. Usage Tracking
+Tracks uploads, dashboard views, completed actions, listing generation and inventory updates.
+
+## SKU Scoring Methodology
+
+```text
+score = 50
+      + delivered_rate * 30
+      + normalized_order_volume * 20
+      - rto_rate * 25
+      - cancellation_rate * 15
+```
+
+All rates are decimal values between 0 and 1. The final score is clamped between 0 and 100.
+
+| Score | Recommended Action |
+|---|---|
+| >= 75 | Push |
+| >= 45 and < 75 | Watch |
+| < 45 | Pause |
+
+## RTO Risk Detection
+
+A segment is classified as high-risk when:
+- RTO rate >= 20%.
+- Minimum 5 orders in the segment.
+
+Analysis covers states, SKUs, state-SKU combinations and order sources.
+
+## AI Service & Fallback Architecture
+
+The AI functionality uses a modular service architecture.
+
+- `backend/app/services/ai_service.py` handles business summary generation.
+- `backend/app/services/listing_generator.py` handles listing generation.
+- Checks for `OPENAI_API_KEY` or `LLM_API_KEY`.
+- Uses rule-based generation when an API key is unavailable.
+
+## Project Setup
 
 ### Backend
 
@@ -39,7 +122,7 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Backend runs at `http://localhost:8000`.
+Backend: `http://localhost:8000`
 
 ### Frontend
 
@@ -49,102 +132,25 @@ npm install
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`.
+Frontend: `http://localhost:5173`
 
-## Sample CSV
-
-Use:
+## Sample Dataset
 
 ```text
 sample_data/sample_orders.csv
 ```
 
-The frontend also exposes the same sample at `/sample_data/sample_orders.csv`.
-
-## SKU Scoring Formula
-
-For each SKU:
-
-```text
-score = 50
-  + delivered_rate * 30
-  + normalized_order_volume * 20
-  - rto_rate * 25
-  - cancellation_rate * 15
-```
-
-Rates are decimal values from `0` to `1`. `normalized_order_volume` is the SKU order volume divided by the highest SKU order volume in the uploaded file. The score is clamped between `0` and `100`.
-
-Actions:
-
-- `Push`: score >= 75
-- `Watch`: score >= 45 and < 75
-- `Pause`: score < 45
-
-## RTO Risk Logic
-
-High risk means:
-
-- RTO rate >= 20%
-- Minimum 5 orders in the segment
-
-The app checks risk for states, SKUs, state + SKU combinations, and order sources.
-
-## AI Fallback
-
-`backend/app/services/ai_service.py` checks for `OPENAI_API_KEY` or `LLM_API_KEY`. If no key exists, the app uses rule-based summary generation so the MVP works locally without external services.
-
-`backend/app/services/listing_generator.py` follows the same fallback pattern for the Listing Doctor.
+The frontend also exposes the sample at `/sample_data/sample_orders.csv`.
 
 ## Future Improvements
 
-- Real LLM integration for richer business recommendations
-- PostgreSQL for multi-seller production usage
-- Meesho, Flipkart, and Amazon platform API integrations
-- WhatsApp daily report for sellers
-- Advanced ML RTO prediction using customer location, price, SKU history, and source quality
-update 26531
-update 29480
-update 24593
-update 32514
-update 27629
-update 26431
-update 1460
-update 1561
-update 21548
-update 25955
-update 9813
-update 10076
-update 13998
-update 17488
-update 23045
-update 12565
-update 13728
-update 28740
-update 19845
-update 23544
-update 8532
-update 19404
-update 19738
-update 13896
-update 27953
-update 26456
-update 25112
-update 6863
-update 5247
-update 26646
-update 19437
-update 18990
-update 9996
-update 6333
-update 30662
-update 27614
-update 29514
-update 2919
-update 26939
-update 14316
-update 5676
-update 28794
-update 4774
-update 28358
-update 30505
+- Richer LLM-powered business recommendations.
+- PostgreSQL for multi-seller production usage.
+- Meesho, Flipkart and Amazon API integrations.
+- WhatsApp-based daily business reports.
+- Advanced ML-based RTO prediction.
+- Demand forecasting and inventory optimization.
+
+---
+
+**AI Seller Copilot** transforms raw marketplace order data into practical business insights and actionable recommendations for small e-commerce sellers.
