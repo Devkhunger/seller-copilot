@@ -61,7 +61,6 @@ FRONTEND_ORIGINS=https://YOUR-FRONTEND-URL
 ```text
 OPENAI_API_KEY=your_key
 OPENAI_MODEL=gpt-5.2
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
 GEMINI_API_KEY=your_key
 GEMINI_MODEL=gemini-2.5-flash
 ```
@@ -85,14 +84,12 @@ Build command: npm run build
 Output directory: dist
 Root directory: frontend
 Environment: VITE_API_BASE=https://YOUR-BACKEND-URL
-Also set: VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id
 ```
 
 Backend CORS:
 
 ```text
 FRONTEND_ORIGINS=https://YOUR-VERCEL-URL
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
 ```
 
 ## Production notes

@@ -4,5 +4,7 @@
 **/.pytest_cache
 **/dist
 **/*.pyc
-backend/seller_copilot.db
 .tools
+**/*.db
+.env
+**/.env
