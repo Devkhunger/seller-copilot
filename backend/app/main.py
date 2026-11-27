@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -9,7 +10,14 @@ from app.routers import ask, auth, dashboard, inventory, listing, ml, profit, up
 
 load_dotenv()
 
-app = FastAPI(title="AI Seller Copilot API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="AI Seller Copilot API", lifespan=lifespan)
 
 
 def _frontend_origins() -> list[str]:
@@ -31,11 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 
 @app.get("/api/health")

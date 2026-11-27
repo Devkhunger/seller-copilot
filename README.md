@@ -134,6 +134,28 @@ npm run dev
 
 Frontend: `http://localhost:5173`
 
+## Configuration
+
+Copy `.env.example` to `backend/.env` and `frontend/.env`. All variables are optional except `VITE_API_BASE` (frontend) in non-local deployments and `FRONTEND_ORIGINS` (backend) when the frontend is not on localhost.
+Without `OPENAI_API_KEY` / `GEMINI_API_KEY` the app uses rule-based fallbacks.
+
+## Running Tests
+
+```bash
+cd backend
+pip install pytest httpx
+python -m pytest -q tests
+```
+
+The same tests plus a frontend build run on every pull request (`.github/workflows/ci.yml`).
+
+## Data & Security Notes
+
+- The SQLite database (`*.db`) is created on first start and is git-ignored. Never commit it: it holds user accounts and order data.
+- Load demo data by logging in and uploading `sample_data/sample_orders.csv`.
+- Secrets go in `.env` files or the hosting dashboard, never in the repo.
+- Deployment: see `DEPLOYMENT.md`. Release history: `docs/CHANGELOG.md`.
+
 ## Sample Dataset
 
 ```text

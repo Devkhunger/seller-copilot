@@ -1,2 +1,26 @@
-.tools/
+# Secrets
 .env
+.env.*
+!.env.example
+
+# Databases (never commit user data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Tools / OS / editors
+.tools/
+.DS_Store
+.idea/
+.vscode/
